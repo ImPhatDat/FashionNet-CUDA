@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\mnist.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\network.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\layer\ave_pooling.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\layer\conv.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\layer\flatten.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\layer\fully_connected.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\layer\max_pooling.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\layer\relu.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\layer\sigmoid.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\layer\softmax.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\loss\cross_entropy_loss.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\loss\mse_loss.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\optimizer\sgd.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\school\Nam4\Parallel Programming\Project\mini-dnn-cpp\src\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{AE2828F3-965C-3AC3-BE9B-4FB700102CD7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
