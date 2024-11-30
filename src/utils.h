@@ -3,20 +3,63 @@
 #include <vector>
 #include <cstdint>
 #include <stdexcept>
+#include <memory>
+#include <algorithm>
 
-class FashionMNISTReader {
+class FashionMnist {
 public:
-    // Structure to hold image data
+    // Image struct to represent a single image
     struct Image {
-        std::vector<uint8_t> pixels;
-        int label;
+        std::vector<uint8_t> pixels;  // Pixel data
+        uint8_t label;                // Classification label
+        int width;   // Image width
+        int height;  // Image height
+
+        // Constructor
+        Image(int w = 28, int h = 28) : width(w), height(h), label(0) {
+            pixels.resize(w * h);
+        }
+
+        // Method to get pixel at specific coordinate
+        uint8_t getPixel(int x, int y) const {
+            if (x < 0 || x >= width || y < 0 || y >= height) {
+                throw std::out_of_range("Pixel coordinates out of bounds");
+            }
+            return pixels[y * width + x];
+        }
+
+        // Print ASCII representation of the image
+        void print() const {
+            std::cout << "Label: " << static_cast<int>(label) << std::endl;
+            for (int y = 0; y < height; ++y) {
+                for (int x = 0; x < width; ++x) {
+                    char pixel = getPixel(x, y) > 128 ? '#' : '.';
+                    std::cout << pixel;
+                }
+                std::cout << std::endl;
+            }
+        }
     };
 
-    // Read images from file
-    static std::vector<Image> readDataset(
+private:
+    // Container for images
+    std::vector<Image> images;
+    int imageWidth;
+    int imageHeight;
+
+public:
+    // Constructor
+    FashionMnist(int width = 28, int height = 28) 
+        : imageWidth(width), imageHeight(height) {}
+
+    // Method to load dataset from files
+    void loadDataset(
         const std::string& imageFilePath, 
         const std::string& labelFilePath
     ) {
+        // Clear existing images
+        images.clear();
+
         // Open image file
         std::ifstream imageFile(imageFilePath, std::ios::binary);
         if (!imageFile) {
@@ -61,40 +104,44 @@ public:
             throw std::runtime_error("Mismatch between image and label counts");
         }
 
-        // Vector to store all images
-        std::vector<Image> dataset;
-        dataset.reserve(numImages);
+        // Resize images vector
+        images.reserve(numImages);
 
         // Read images and labels
         for (uint32_t i = 0; i < numImages; ++i) {
-            Image image;
-            image.pixels.resize(rows * cols);
+            Image image(imageWidth, imageHeight);
             
             // Read image pixels
+            image.pixels.resize(rows * cols);
             imageFile.read(reinterpret_cast<char*>(image.pixels.data()), rows * cols);
             
             // Read label
-            uint8_t label;
-            labelFile.read(reinterpret_cast<char*>(&label), 1);
-            image.label = label;
+            labelFile.read(reinterpret_cast<char*>(&image.label), 1);
 
-            dataset.push_back(std::move(image));
+            images.push_back(std::move(image));
         }
-
-        return dataset;
     }
 
-    // Utility function to print image details
-    static void printImage(const Image& image, int rows = 28, int cols = 28) {
-        std::cout << "Label: " << image.label << std::endl;
-        
-        // Print ASCII representation of the image
-        for (int i = 0; i < rows; ++i) {
-            for (int j = 0; j < cols; ++j) {
-                char pixel = image.pixels[i * cols + j] > 128 ? '#' : '.';
-                std::cout << pixel;
-            }
-            std::cout << std::endl;
+    // Getters
+    size_t getImageCount() const { return images.size(); }
+    const Image& getImage(size_t index) const {
+        if (index >= images.size()) {
+            throw std::out_of_range("Image index out of range");
         }
+        return images[index];
+    }
+
+    // Iterate through images
+    const std::vector<Image>& getImages() const { return images; }
+
+    // Method to get images with a specific label
+    std::vector<Image> getImagesByLabel(uint8_t label) const {
+        std::vector<Image> labeledImages;
+        for (const auto& image : images) {
+            if (image.label == label) {
+                labeledImages.push_back(image);
+            }
+        }
+        return labeledImages;
     }
 };
