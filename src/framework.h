@@ -2,6 +2,7 @@
 #include <cmath>
 #include <algorithm>
 #include <string>
+#include <cstring>
 #include <cmath>
 
 void relu(float* input, int rows, int cols) {
@@ -58,7 +59,7 @@ void matmul(const float* A, const float* B, float* C, int rowsA, int colsA, int 
 }
 
 
-void dense_forward(const float* input, const float* weights, const float* biases, float* output, 
+void dense_forward(const float* input, float* output, const float* weights, const float* biases, 
            int input_size, int output_size, int batch_size, std::string activation_type = "none") {
     
     matmul(input, weights, output, batch_size, input_size, output_size);
@@ -78,5 +79,38 @@ void dense_forward(const float* input, const float* weights, const float* biases
     } else if (activation_type != "none") {
         std::cerr << "Error: Unsupported activation type \"" << activation_type << "\". Supported types are: relu, softmax, none.\n";
     }
+}
+
+void model_forward(const float* input, int input_size, float* output, const float* weights[], const float* biases[], 
+           int output_sizes[], int num_dense, int batch_size, std::string activation_types[]) {
     
+    float* x = new float[batch_size * output_sizes[0]];
+    dense_forward(input, x, weights[0], biases[0], input_size, output_sizes[0], batch_size, activation_types[0]);
+
+    for (int i = 1; i < num_dense; i++) {
+        float* tmp_x = new float[batch_size * output_sizes[i]];
+        dense_forward(x, tmp_x, weights[i], biases[i], output_sizes[i - 1], output_sizes[i], batch_size, activation_types[i]);
+
+        delete[] x;
+        x = tmp_x;
+    }
+    std::memcpy(output, x, sizeof(x) * batch_size * output_sizes[num_dense - 1]);
+}
+
+// assume sum_over_batch
+float categorical_crossentropy_loss(int* y_true, float* y_pred, int batch_size, int num_classes) {
+    float total_loss = 0.0f;
+
+    for (int i = 0; i < batch_size; ++i) {
+        int true_class = y_true[i];
+        float predicted_prob = y_pred[i * num_classes + true_class];
+        
+        // Avoid log(0) by clamping probabilities to a small positive value
+        const float epsilon = 1e-7f;
+        predicted_prob = std::max(predicted_prob, epsilon);
+
+        total_loss -= std::log(predicted_prob);
+    }
+
+    return total_loss / batch_size;
 }
