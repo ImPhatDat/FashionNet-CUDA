@@ -1,36 +1,28 @@
+#include <stdio.h>
+#include <stdint.h>
 #include "utils.h"
+#include "framework.h"
 
-// Example usage
-int main() {
-    try {
-        // Create FashionMnist object
-        FashionMnist fashionMnist;
+const std::string train_imageFilePath = "../data/fashion-mnist/train-images-idx3-ubyte";
+const std::string train_labelFilePath = "../data/fashion-mnist/train-labels-idx1-ubyte";
+const std::string test_imageFilePath = "../data/fashion-mnist/t10k-images-idx3-ubyte";
+const std::string test_labelFilePath = "../data/fashion-mnist/t10k-labels-idx1-ubyte";
 
-        // Paths to your MNIST Fashion dataset files
-        std::string imageFilePath = "../data/fashion-mnist/train-images-idx3-ubyte";
-        std::string labelFilePath = "../data/fashion-mnist/train-labels-idx1-ubyte";
 
-        // Load the dataset
-        fashionMnist.loadDataset(imageFilePath, labelFilePath);
+int main(int argc, char ** argv) {
+    printDeviceInfo();
+    
+    // Create FashionMnist object
+    FashionMnist train_set;
+    train_set.loadDataset(train_imageFilePath, train_labelFilePath);
+    FashionMnist test_set;
+    test_set.loadDataset(test_imageFilePath, test_labelFilePath);
 
-        // Print total number of images
-        std::cout << "Total images: " << fashionMnist.getImageCount() << std::endl;
+    // Print total number of images
+    std::cout << "Total train images: " << train_set.getImageCount() << std::endl;
+    std::cout << "Total test images: " << test_set.getImageCount() << std::endl;
 
-        // Print first 5 images
-        for (int i = 0; i < 5; ++i) {
-            std::cout << "Image " << i << ":" << std::endl;
-            fashionMnist.getImage(i).print();
-            std::cout << std::endl;
-        }
 
-        // Get images with label 0 (T-Shirt/Top)
-        auto tshirtImages = fashionMnist.getImagesByLabel(0);
-        std::cout << "Number of T-Shirt/Top images: " << tshirtImages.size() << std::endl;
-
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-        return 1;
-    }
 
     return 0;
 }

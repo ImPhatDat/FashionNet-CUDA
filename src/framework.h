@@ -5,6 +5,12 @@
 #include <cstring>
 #include <cmath>
 
+// Model configurations
+const int DENSE_OUTPUT[] = {128, 128, 10};
+const std::string ACTIVATION_TYPES[] = {"relu", "relu", "softmax"};
+const int BATCH_SIZE = 64;
+
+
 void relu(float* input, int rows, int cols) {
     for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {

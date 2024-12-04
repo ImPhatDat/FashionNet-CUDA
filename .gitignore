@@ -1,3 +1,5 @@
+**.vscode**
+
 # Prerequisites
 *.d
 
@@ -31,7 +33,6 @@
 *.out
 *.app
 
-.vscode/**
 
 **build/
 **third_party/
