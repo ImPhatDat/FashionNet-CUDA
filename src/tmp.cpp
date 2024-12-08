@@ -1,33 +1,38 @@
-#include <cmath>   // For std::log
-#include <iostream> // For std::cout
-
-float categorical_crossentropy_loss(int* y_true, float* y_pred, int batch_size, int num_classes) {
-    float total_loss = 0.0f;
-
-    for (int i = 0; i < batch_size; ++i) {
-        int true_class = y_true[i];
-        float predicted_prob = y_pred[i * num_classes + true_class];
-        
-        // Avoid log(0) by clamping probabilities to a small positive value
-        const float epsilon = 1e-7f;
-        predicted_prob = std::max(predicted_prob, epsilon);
-
-        total_loss -= std::log(predicted_prob);
-    }
-
-    return total_loss / batch_size;
-}
+#include <iostream>
+#include <string>
+#include <random>
+#include <cstring> // For memset
+#include "dense.h"
 
 // Example usage
 int main() {
-    int y_true[] = {1, 2}; // Batch size = 3, True labels for each sample
-    float y_pred[] = {0.05, 0.95, 0,   // Predicted probs for sample 1
-                      0.1, 0.8, 0.1};  // Predicted probs for sample 3
-    int batch_size = 2;
-    int num_classes = 3;
+    int input_size = 128;
+    int output_size = 64;
+    int batch_size = 32;
 
-    float loss = categorical_crossentropy_loss(y_true, y_pred, batch_size, num_classes);
-    std::cout << "Loss: " << loss << std::endl;
+    // Random number generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Create a Dense layer
+    Dense dense(input_size, output_size, batch_size, gen);
+
+    // Input and output arrays
+    float* input = new float[batch_size * input_size];
+    float* output = new float[batch_size * output_size];
+
+    // Fill input with random values (optional)
+    initialize_1d_array(input, batch_size, input_size, gen);
+
+    // Perform forward pass
+    dense.forward(input, output, "relu");
+
+    // Print the parameters
+    dense.print_params();
+
+    // Clean up
+    delete[] input;
+    delete[] output;
 
     return 0;
 }

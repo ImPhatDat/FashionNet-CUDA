@@ -163,7 +163,6 @@ private:
     size_t imageCount;
     int imageWidth;
     int imageHeight;
-    std::mt19937 randomGenerator; // Random number generator
 
 public:
     // Constructor
@@ -291,16 +290,12 @@ public:
     }
 
     // Method to shuffle the dataset
-    void shuffle(unsigned int seed) {
+    void shuffle(std::mt19937 randomGenerator) {
         if (!images || imageCount == 0) return;
         
-        randomGenerator.seed(seed);
-        // Create a random device and a random number generator
-        std::random_device rd;
-        std::mt19937 gen(rd());
 
         // Shuffle the array
-        std::shuffle(images, images + imageCount, gen);
+        std::shuffle(images, images + imageCount, randomGenerator);
     }
 
 };
