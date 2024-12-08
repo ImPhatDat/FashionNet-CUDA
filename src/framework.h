@@ -5,22 +5,17 @@
 #include <cstring>
 #include <cmath>
 
-// Model configurations
-const int DENSE_OUTPUT[] = {128, 128, 10};
-const std::string ACTIVATION_TYPES[] = {"relu", "relu", "softmax"};
-const int BATCH_SIZE = 64;
-
 void relu(float* input, int rows, int cols) {
     for (int i = 0; i < rows; ++i) {
+        int rowStart = i * cols;
         for (int j = 0; j < cols; ++j) {
-            int index = i * cols + j;
-            // ReLU activation: max(0, x)
-            input[index] = std::max(0.0f, input[index]);
+            input[rowStart + j] = std::max(0.0f, input[rowStart + j]);
         }
-    }
+}
 }
 
 void softmax(float* input, int rows, int cols) {
+    float* expValues = new float[cols];
     for (int i = 0; i < rows; ++i) {
         // Find max value for numerical stability
         float maxVal = input[i * cols];
@@ -30,7 +25,6 @@ void softmax(float* input, int rows, int cols) {
 
         // Compute exponentials and sum
         float expSum = 0.0f;
-        float* expValues = new float[cols];
 
         for (int j = 0; j < cols; ++j) {
             int index = i * cols + j;
@@ -45,22 +39,22 @@ void softmax(float* input, int rows, int cols) {
             input[index] = expValues[j] / expSum;
         }
 
-        delete[] expValues;
     }
+    delete[] expValues;
 }
 
 void matmul(const float* A, const float* B, float* C, int rowsA, int colsA, int colsB) {
     // Perform matrix multiplication
     for (int i = 0; i < rowsA; ++i) {
+        int rowStartA = i * colsA;
         for (int j = 0; j < colsB; ++j) {
             float sum = 0;
             for (int k = 0; k < colsA; ++k) {
-                sum += A[i * colsA + k] * B[k * colsB + j];
+                sum += A[rowStartA + k] * B[k * colsB + j];
             }
             C[i * colsB + j] = sum;
         }
     }
-    
 }
 
 

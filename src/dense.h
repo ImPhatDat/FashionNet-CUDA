@@ -14,65 +14,20 @@ void initialize_1d_array(float* array, int rows, int cols, std::mt19937& gen) {
     }
 }
 
-// Initialize weights and biases for multiple dense layers
-void initialize_dense_layers(
-    int num_layers,
-    int BATCH_SIZE,
-    const int* output_sizes,
-    float** weights,
-    float** biases,
-    std::mt19937& gen
-) {
-    for (int i = 0; i < num_layers; ++i) {
-        int output_size = output_sizes[i];
-
-        // Allocate memory for weights and initialize
-        weights[i] = new float[BATCH_SIZE * output_size];
-        initialize_1d_array(weights[i], BATCH_SIZE, output_size, gen);
-
-        // Allocate memory for biases and initialize (biases are 1D with length = output_size)
-        biases[i] = new float[output_size];
-        for (int j = 0; j < output_size; ++j) {
-            biases[i][j] = 0.0f; // Initialize biases to zero
-        }
-    }
-}
-
-void dense_forward(const float* input, float* output, const float* weights, const float* biases, 
-           int input_size, int output_size, int batch_size, std::string activation_type = "none") {
-    
-    matmul(input, weights, output, batch_size, input_size, output_size);
-
-    if (biases != NULL) {
-        for (int i = 0; i < batch_size; ++i) {
-            for (int j = 0; j < output_size; ++j) {
-                output[i * output_size + j] += biases[j];
-            }
-        }
-    }
-
-    if (activation_type == "relu") {
-        relu(output, batch_size, output_size);
-    } else if (activation_type == "softmax") {
-        softmax(output, batch_size, output_size);
-    } else if (activation_type != "none") {
-        std::cerr << "Error: Unsupported activation type \"" << activation_type << "\". Supported types are: relu, softmax, none.\n";
-    }
-}
-
 class Dense {
 private:
     int input_size;
     int output_size;
     int batch_size;
+    std::string activation_type;
 
     float* weights; // 1D array to represent weights (row-major)
     float* biases;  // 1D array to represent biases
 
 public:
     // Constructor
-    Dense(int input_size, int output_size, int batch_size, std::mt19937& gen) 
-        : input_size(input_size), output_size(output_size), batch_size(batch_size) {
+    Dense(int input_size, int output_size, int batch_size, std::string activation_type, std::mt19937& gen) 
+        : input_size(input_size), output_size(output_size), batch_size(batch_size), activation_type(activation_type) {
         // Allocate and initialize weights and biases
         weights = new float[input_size * output_size];
         biases = new float[output_size];
@@ -88,22 +43,22 @@ public:
     }
 
     // Forward pass
-    void forward(const float* input, float* output, const std::string& activation_type = "none") const {
+    void forward(const float* input, float* output) const {
         // Perform matrix multiplication and bias addition
-        matmul(input, weights, output, batch_size, input_size, output_size);
+        matmul(input, this->weights, output, this->batch_size, this->input_size, this->output_size);
 
         // Add biases
-        for (int i = 0; i < batch_size; ++i) {
-            for (int j = 0; j < output_size; ++j) {
-                output[i * output_size + j] += biases[j];
+        for (int i = 0; i < this->batch_size; ++i) {
+            for (int j = 0; j < this->output_size; ++j) {
+                output[i * output_size + j] += this->biases[j];
             }
         }
 
         // Apply activation function if specified
         if (activation_type == "relu") {
-            relu(output, batch_size, output_size);
+            relu(output, this->batch_size, this->output_size);
         } else if (activation_type == "softmax") {
-            softmax(output, batch_size, output_size);
+            softmax(output, this->batch_size, this->output_size);
         } else if (activation_type != "none") {
             std::cerr << "Error: Unsupported activation type \"" << activation_type << "\". Supported types are: relu, softmax, none.\n";
         }

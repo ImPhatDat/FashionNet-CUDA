@@ -6,6 +6,12 @@
 
 std::mt19937 global_rng(1); // Random number generator
 
+// Model configurations
+const int DENSE_OUTPUT[] = {128, 128, 10};
+const std::string ACTIVATION_TYPES[] = {"relu", "relu", "softmax"};
+const int BATCH_SIZE = 64;
+
+
 const std::string train_imageFilePath = "../data/fashion-mnist/train-images-idx3-ubyte";
 const std::string train_labelFilePath = "../data/fashion-mnist/train-labels-idx1-ubyte";
 const std::string test_imageFilePath = "../data/fashion-mnist/t10k-images-idx3-ubyte";

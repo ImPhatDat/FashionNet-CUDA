@@ -292,9 +292,6 @@ public:
     // Method to shuffle the dataset
     void shuffle(std::mt19937 randomGenerator) {
         if (!images || imageCount == 0) return;
-        
-
-        // Shuffle the array
         std::shuffle(images, images + imageCount, randomGenerator);
     }
 
