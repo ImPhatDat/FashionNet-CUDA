@@ -328,41 +328,41 @@ public:
     }
 };
 
-
-float** prepareBatches(const FashionMnist& dataset, int batch_size, int input_size) {
+void prepareBatchesWithLabels(
+    const FashionMnist& dataset, 
+    int batch_size, 
+    int input_size, 
+    float**& batches, 
+    uint8_t**& batch_labels
+) {
     size_t total_images = dataset.getImageCount();
     size_t num_batches = total_images / batch_size;
-    
+
     // Allocate array of batches
-    float** batches = new float*[num_batches];
-    
+    batches = new float*[num_batches];
+    batch_labels = new uint8_t*[num_batches];
+
     for (size_t batch = 0; batch < num_batches; ++batch) {
-        // Allocate memory for current batch
+        // Allocate memory for current batch and labels
         batches[batch] = new float[batch_size * input_size];
-        
+        batch_labels[batch] = new uint8_t[batch_size];
+
         for (int i = 0; i < batch_size; ++i) {
             // Calculate the index of the current image in the dataset
             size_t image_index = batch * batch_size + i;
-            
+
             // Get the current image
             const auto& image = dataset.getImage(image_index);
-            
+
             // Copy pixel data to batch
             for (int j = 0; j < input_size; ++j) {
                 // Normalize pixel values to [0, 1] range
-                batches[batch][i * input_size + j] = 
+                batches[batch][i * input_size + j] =
                     static_cast<float>(image.pixels[j]) / 255.0f;
             }
+
+            // Store the label
+            batch_labels[batch][i] = image.label;
         }
     }
-    
-    return batches;
-}
-
-// Don't forget a cleanup function
-void cleanupBatches(float** batches, size_t num_batches) {
-    for (size_t i = 0; i < num_batches; ++i) {
-        delete[] batches[i];
-    }
-    delete[] batches;
 }

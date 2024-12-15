@@ -10,7 +10,8 @@ std::mt19937 global_rng(1); // Random number generator
 // Model configurations
 const int INPUT_SIZE = 784;   // Example: MNIST image input size
 const int BATCH_SIZE = 64;
-const int DENSE_OUTPUT[] = {128, 128, 10};
+const int OUTPUT_SIZE = 10;
+const int DENSE_OUTPUT[] = {128, 128, OUTPUT_SIZE};
 const int NUM_LAYERS = sizeof(DENSE_OUTPUT) / sizeof(DENSE_OUTPUT[0]);
 const std::string ACTIVATION_TYPES[] = {"relu", "relu", "softmax"};
 
@@ -39,11 +40,11 @@ int main(int argc, char ** argv) {
 
     for (size_t i = 0; i < NUM_LAYERS; ++i) {
         layers[i] = Dense(
-            previous_size,       // input size 
-            DENSE_OUTPUT[i],     // output size
-            BATCH_SIZE,          // batch size
-            ACTIVATION_TYPES[i], // activation type
-            global_rng           // random number generator
+            previous_size,               // input size 
+            DENSE_OUTPUT[i],             // output size
+            BATCH_SIZE,                  // batch size
+            ACTIVATION_TYPES[i],         // activation type
+            global_rng                   // random number generator
         );
         previous_size = DENSE_OUTPUT[i]; // Update input size for next layer
     }
@@ -55,16 +56,31 @@ int main(int argc, char ** argv) {
     // Prepare batches
     train_set.shuffle(global_rng);
 
-    float** input_batches = prepareBatches(train_set, BATCH_SIZE, INPUT_SIZE);
+    float** x_batches = nullptr;
+    uint8_t** y_batches = nullptr;
 
-    float* output = new float[BATCH_SIZE * DENSE_OUTPUT[NUM_LAYERS - 1]];
+    prepareBatchesWithLabels(train_set, BATCH_SIZE, INPUT_SIZE, x_batches, y_batches);
 
-    model_forward(input_batches[0], INPUT_SIZE, output, layers, NUM_LAYERS);
+    float** output_batches = new float*[num_batches];
+    for (int bi = 0; bi < num_batches; ++bi) {
+        output_batches[bi] = new float[BATCH_SIZE * OUTPUT_SIZE];
+    }
+
+    for (int bi = 0; bi < num_batches; ++bi) {
+        model_forward(x_batches[bi], INPUT_SIZE, output_batches[bi], layers, NUM_LAYERS);
+    }
 
     // When done
-    cleanupBatches(input_batches, num_batches);
-    delete[] output;
-    delete[] layers;
+    for (size_t i = 0; i < num_batches; ++i) {
+        delete[] x_batches[i];
+        delete[] output_batches[i];
+        delete[] y_batches[i];
+    }
+    delete[] x_batches;
+    delete[] output_batches;
+    delete[] y_batches;
 
+
+    delete[] layers;
     return 0;
 }
