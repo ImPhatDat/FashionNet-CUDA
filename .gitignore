@@ -36,3 +36,4 @@
 
 **build/
 **third_party/
+.venv/

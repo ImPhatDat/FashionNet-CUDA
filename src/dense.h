@@ -8,12 +8,16 @@
 #include "framework.h"
 #pragma once
 
-void initialize_1d_array(float *array, int rows, int cols, std::mt19937 &gen)
+void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
 {
     std::uniform_real_distribution<float> dis(-1.0, 1.0); // Uniform distribution
-    for (int i = 0; i < rows * cols; ++i)
+    for (int i = 0; i < rows; ++i)
     {
-        array[i] = dis(gen); // Random value between -1 and 1
+        for (int j = 0; j < cols; ++j)
+        {
+            weights[i * cols + j] = dis(gen); // Random value between -1 and 1
+            biases[j] = 0;                    // bias with 0
+        }
     }
 }
 
@@ -27,6 +31,10 @@ private:
 
     float *weights = nullptr; // 1D array to represent weights (row-major)
     float *biases = nullptr;  // 1D array to represent biases
+
+    // Gradients
+    float *grad_weights = nullptr;
+    float *grad_biases = nullptr;
 
 public:
     // Default Constructor
@@ -45,91 +53,27 @@ public:
         weights = new float[input_size * output_size];
         biases = new float[output_size];
 
-        initialize_1d_array(weights, input_size, output_size, gen); // Initialize weights
-        std::memset(biases, 0, sizeof(float) * output_size);        // Initialize biases to zero
+        grad_weights = new float[input_size * output_size];
+        grad_biases = new float[output_size];
+
+        initialize_dense(weights, biases, input_size, output_size, gen); // Initialize weights
     }
 
-
-    // Copy constructor
-    Dense(const Dense& other)
-        : input_size(other.input_size), output_size(other.output_size), 
-          batch_size(other.batch_size), activation_type(other.activation_type)
-    {
-        weights = new float[input_size * output_size];
-        biases = new float[output_size];
-
-        std::memcpy(weights, other.weights, sizeof(float) * input_size * output_size);
-        std::memcpy(biases, other.biases, sizeof(float) * output_size);
-    }
-
-    // Move constructor
-    Dense(Dense&& other) noexcept
-        : input_size(other.input_size), output_size(other.output_size), 
-          batch_size(other.batch_size), activation_type(std::move(other.activation_type))
-    {
-        weights = other.weights;
-        biases = other.biases;
-
-        other.weights = nullptr;
-        other.biases = nullptr;
-        other.input_size = other.output_size = other.batch_size = 0;
-    }
-
-    // Copy assignment operator
-    Dense& operator=(const Dense& other)
-    {
-        if (this != &other)
-        {
-            // Clean up existing resources
-            delete[] weights;
-            delete[] biases;
-
-            // Copy new resources
-            input_size = other.input_size;
-            output_size = other.output_size;
-            batch_size = other.batch_size;
-            activation_type = other.activation_type;
-
-            weights = new float[input_size * output_size];
-            biases = new float[output_size];
-
-            std::memcpy(weights, other.weights, sizeof(float) * input_size * output_size);
-            std::memcpy(biases, other.biases, sizeof(float) * output_size);
-        }
-        return *this;
-    }
-
-    // Move assignment operator
-    Dense& operator=(Dense&& other) noexcept
-    {
-        if (this != &other)
-        {
-            // Clean up existing resources
-            delete[] weights;
-            delete[] biases;
-
-            // Move resources
-            input_size = other.input_size;
-            output_size = other.output_size;
-            batch_size = other.batch_size;
-            activation_type = std::move(other.activation_type);
-
-            weights = other.weights;
-            biases = other.biases;
-
-            other.weights = nullptr;
-            other.biases = nullptr;
-            other.input_size = other.output_size = other.batch_size = 0;
-        }
-        return *this;
-    }
-
+    int get_input_size() const { return input_size; }
+    int get_batch_size() const { return batch_size; }
+    int get_output_size() const { return output_size; }
+    float *get_weights() const { return weights; }
+    float *get_biases() const { return biases; }
+    float *get_grad_weights() const { return grad_weights; }
+    float *get_grad_biases() const { return grad_biases; }
 
     // Destructor
     ~Dense()
     {
         delete[] weights;
         delete[] biases;
+        delete[] grad_weights;
+        delete[] grad_biases;
     }
 
     // Forward pass
@@ -162,33 +106,38 @@ public:
         }
     }
 
-    int get_batch_size() const { return batch_size; }
-
-    int get_output_size() const { return output_size; }
-
-    float *get_weights() const { return weights; }
-
-    float *get_biases() const { return biases; }
-
-    // Utility for debugging: Print weights and biases
-    void print_params() const
+    // Backward pass
+    void backward(const float *input, const float *grad_output, float *grad_input)
     {
-        std::cout << "Weights (row-major):\n";
-        for (int i = 0; i < input_size; ++i)
+        // Reset gradients
+        std::memset(grad_weights, 0, sizeof(float) * input_size * output_size);
+        std::memset(grad_biases, 0, sizeof(float) * output_size);
+
+        // Compute gradient of biases
+        for (int i = 0; i < batch_size; ++i)
         {
             for (int j = 0; j < output_size; ++j)
             {
-                std::cout << weights[i * output_size + j] << " ";
+                grad_biases[j] += grad_output[i * output_size + j];
             }
-            std::cout << "\n";
+        }
+        if (input != nullptr)
+        {
+            // Compute gradient of weights
+            for (int i = 0; i < batch_size; ++i)
+            {
+                for (int j = 0; j < output_size; ++j)
+                {
+                    for (int k = 0; k < input_size; ++k)
+                    {
+                        grad_weights[k * output_size + j] += input[i * input_size + k] * grad_output[i * output_size + j];
+                    }
+                }
+            }
         }
 
-        std::cout << "Biases:\n";
-        for (int j = 0; j < output_size; ++j)
-        {
-            std::cout << biases[j] << " ";
-        }
-        std::cout << "\n";
+        // Compute gradient of input
+        matmul(grad_output, weights, grad_input, batch_size, output_size, input_size);
     }
 };
 
@@ -217,4 +166,26 @@ void model_forward(const float *input, int input_size, float *output, Dense laye
 
     // Free memory
     delete[] x;
+}
+
+void model_backward(const float *input, int input_size, const float *output_grad, Dense layers[], int num_dense, float *input_grad)
+{
+    // Allocate memory for intermediate gradients
+    float *current_grad = new float[layers[num_dense - 1].get_batch_size() * layers[num_dense - 1].get_output_size()];
+    std::memcpy(current_grad, output_grad, sizeof(float) * layers[num_dense - 1].get_batch_size() * layers[num_dense - 1].get_output_size());
+
+    for (int i = num_dense - 1; i >= 0; --i)
+    {
+        float *prev_grad = new float[layers[i].get_batch_size() * layers[i].get_input_size()];
+        layers[i].backward((i == 0 ? input : nullptr), current_grad, prev_grad);
+
+        delete[] current_grad;
+        current_grad = prev_grad;
+    }
+
+    // Copy the final gradient to the input_grad array
+    std::memcpy(input_grad, current_grad, sizeof(float) * layers[0].get_batch_size() * layers[0].get_input_size());
+
+    // Free memory
+    delete[] current_grad;
 }

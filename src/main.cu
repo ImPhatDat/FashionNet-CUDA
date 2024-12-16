@@ -24,32 +24,14 @@ const std::string test_labelFilePath = "../data/fashion-mnist/t10k-labels-idx1-u
 int main(int argc, char ** argv) {
     printDeviceInfo();
     
-    // Create FashionMnist object
+    // Load dataset
     FashionMnist train_set;
     train_set.loadDataset(train_imageFilePath, train_labelFilePath);
     FashionMnist test_set;
     test_set.loadDataset(test_imageFilePath, test_labelFilePath);
-
-    // Print total number of images
     std::cout << "Total train images: " << train_set.getImageCount() << std::endl;
     std::cout << "Total test images: " << test_set.getImageCount() << std::endl;
 
-    // Allocate dynamic array for Dense layers
-    Dense* layers = new Dense[NUM_LAYERS];
-    int previous_size = INPUT_SIZE;
-
-    for (size_t i = 0; i < NUM_LAYERS; ++i) {
-        layers[i] = Dense(
-            previous_size,               // input size 
-            DENSE_OUTPUT[i],             // output size
-            BATCH_SIZE,                  // batch size
-            ACTIVATION_TYPES[i],         // activation type
-            global_rng                   // random number generator
-        );
-        previous_size = DENSE_OUTPUT[i]; // Update input size for next layer
-    }
-
-    // Assuming train_set is already loaded
     size_t total_images = train_set.getImageCount();
     size_t num_batches = total_images / BATCH_SIZE;
 
@@ -66,11 +48,26 @@ int main(int argc, char ** argv) {
         output_batches[bi] = new float[BATCH_SIZE * OUTPUT_SIZE];
     }
 
+    // Allocate for Dense layers
+    Dense* layers = new Dense[NUM_LAYERS];
+    int previous_size = INPUT_SIZE;
+
+    for (size_t i = 0; i < NUM_LAYERS; ++i) {
+        layers[i] = Dense(
+            previous_size,               // input size 
+            DENSE_OUTPUT[i],             // output size
+            BATCH_SIZE,                  // batch size
+            ACTIVATION_TYPES[i],         // activation type
+            global_rng                   // random number generator
+        );
+        previous_size = DENSE_OUTPUT[i]; // Update input size for next layer
+    }
+
     for (int bi = 0; bi < num_batches; ++bi) {
         model_forward(x_batches[bi], INPUT_SIZE, output_batches[bi], layers, NUM_LAYERS);
     }
 
-    // When done
+    // Deallocate
     for (size_t i = 0; i < num_batches; ++i) {
         delete[] x_batches[i];
         delete[] output_batches[i];
