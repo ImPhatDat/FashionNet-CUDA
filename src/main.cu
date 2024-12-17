@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <random>
-#include "utils.h"
-#include "framework.h"
-#include "dense.h"
+#include "framework.cu"
+#include "dense.cu"
+#include "fashion_mnist.cu"
 
 std::mt19937 global_rng(1); // Random number generator
 
@@ -19,6 +19,73 @@ const std::string train_imageFilePath = "../data/fashion-mnist/train-images-idx3
 const std::string train_labelFilePath = "../data/fashion-mnist/train-labels-idx1-ubyte";
 const std::string test_imageFilePath = "../data/fashion-mnist/t10k-images-idx3-ubyte";
 const std::string test_labelFilePath = "../data/fashion-mnist/t10k-labels-idx1-ubyte";
+
+
+#define CHECK(call)                                                \
+    {                                                              \
+        const cudaError_t error = call;                            \
+        if (error != cudaSuccess)                                  \
+        {                                                          \
+            fprintf(stderr, "Error: %s:%d, ", __FILE__, __LINE__); \
+            fprintf(stderr, "code: %d, reason: %s\n", error,       \
+                    cudaGetErrorString(error));                    \
+            exit(EXIT_FAILURE);                                    \
+        }                                                          \
+    }
+
+struct GpuTimer
+{
+    cudaEvent_t start;
+    cudaEvent_t stop;
+
+    GpuTimer()
+    {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+    }
+
+    ~GpuTimer()
+    {
+        cudaEventDestroy(start);
+        cudaEventDestroy(stop);
+    }
+
+    void Start()
+    {
+        cudaEventRecord(start, 0);
+        cudaEventSynchronize(start);
+    }
+
+    void Stop()
+    {
+        cudaEventRecord(stop, 0);
+    }
+
+    float Elapsed()
+    {
+        float elapsed;
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&elapsed, start, stop);
+        return elapsed;
+    }
+};
+
+void printDeviceInfo()
+{
+    cudaDeviceProp devProv;
+    CHECK(cudaGetDeviceProperties(&devProv, 0));
+    printf("**********GPU info**********\n");
+    printf("Name: %s\n", devProv.name);
+    printf("Compute capability: %d.%d\n", devProv.major, devProv.minor);
+    printf("Num SMs: %d\n", devProv.multiProcessorCount);
+    printf("Max num threads per SM: %d\n", devProv.maxThreadsPerMultiProcessor);
+    printf("Max num warps per SM: %d\n", devProv.maxThreadsPerMultiProcessor / devProv.warpSize);
+    printf("GMEM: %lu bytes\n", devProv.totalGlobalMem);
+    printf("CMEM: %lu bytes\n", devProv.totalConstMem);
+    printf("L2 cache: %i bytes\n", devProv.l2CacheSize);
+    printf("SMEM / one SM: %lu bytes\n", devProv.sharedMemPerMultiprocessor);
+    printf("****************************\n");
+}
 
 
 int main(int argc, char ** argv) {
@@ -41,12 +108,14 @@ int main(int argc, char ** argv) {
     float** x_batches = nullptr;
     uint8_t** y_batches = nullptr;
 
-    prepareBatchesWithLabels(train_set, BATCH_SIZE, INPUT_SIZE, x_batches, y_batches);
+    train_set.prepareBatchesWithLabels(BATCH_SIZE, INPUT_SIZE, x_batches, y_batches);
 
     float** output_batches = new float*[num_batches];
     for (int bi = 0; bi < num_batches; ++bi) {
         output_batches[bi] = new float[BATCH_SIZE * OUTPUT_SIZE];
     }
+
+    // std::cout << y_batches[0] << std::endl;
 
     // Allocate for Dense layers
     Dense* layers = new Dense[NUM_LAYERS];
@@ -64,7 +133,7 @@ int main(int argc, char ** argv) {
     }
 
     for (int bi = 0; bi < num_batches; ++bi) {
-        model_forward(x_batches[bi], INPUT_SIZE, output_batches[bi], layers, NUM_LAYERS);
+        model_forward(x_batches[bi], output_batches[bi], layers, NUM_LAYERS);
     }
 
     // Deallocate

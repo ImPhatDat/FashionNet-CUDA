@@ -1,3 +1,6 @@
+#ifndef DENSE_H
+#define DENSE_H
+
 #include <iostream>
 #include <cmath>
 #include <algorithm>
@@ -8,18 +11,7 @@
 #include "framework.h"
 #pragma once
 
-void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
-{
-    std::uniform_real_distribution<float> dis(-1.0, 1.0); // Uniform distribution
-    for (int i = 0; i < rows; ++i)
-    {
-        for (int j = 0; j < cols; ++j)
-        {
-            weights[i * cols + j] = dis(gen); // Random value between -1 and 1
-            biases[j] = 0;                    // bias with 0
-        }
-    }
-}
+void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen);
 
 class Dense
 {
@@ -37,27 +29,9 @@ private:
     float *grad_biases = nullptr;
 
 public:
-    // Default Constructor
-    Dense()
-        : input_size(0), output_size(0), batch_size(0), activation_type("none"),
-          weights(nullptr), biases(nullptr)
-    {
-        // Empty: no memory allocation needed
-    }
-
-    // Constructor
-    Dense(int input_size, int output_size, int batch_size, std::string activation_type, std::mt19937 &gen)
-        : input_size(input_size), output_size(output_size), batch_size(batch_size), activation_type(activation_type)
-    {
-        // Allocate and initialize weights and biases
-        weights = new float[input_size * output_size];
-        biases = new float[output_size];
-
-        grad_weights = new float[input_size * output_size];
-        grad_biases = new float[output_size];
-
-        initialize_dense(weights, biases, input_size, output_size, gen); // Initialize weights
-    }
+    Dense();
+    Dense(int input_size, int output_size, int batch_size, std::string activation_type, std::mt19937 &gen);
+    Dense &operator=(const Dense &other);
 
     int get_input_size() const { return input_size; }
     int get_batch_size() const { return batch_size; }
@@ -77,115 +51,10 @@ public:
     }
 
     // Forward pass
-    void forward(const float *input, float *output) const
-    {
-        // Perform matrix multiplication and bias addition
-        matmul(input, this->weights, output, this->batch_size, this->input_size, this->output_size);
-
-        // Add biases
-        for (int i = 0; i < this->batch_size; ++i)
-        {
-            for (int j = 0; j < this->output_size; ++j)
-            {
-                output[i * output_size + j] += this->biases[j];
-            }
-        }
-
-        // Apply activation function if specified
-        if (activation_type == "relu")
-        {
-            relu(output, this->batch_size, this->output_size);
-        }
-        else if (activation_type == "softmax")
-        {
-            softmax(output, this->batch_size, this->output_size);
-        }
-        else if (activation_type != "none")
-        {
-            std::cerr << "Error: Unsupported activation type \"" << activation_type << "\". Supported types are: relu, softmax, none.\n";
-        }
-    }
+    void forward(const float *input, float *output) const;
 
     // Backward pass
-    void backward(const float *input, const float *grad_output, float *grad_input)
-    {
-        // Reset gradients
-        std::memset(grad_weights, 0, sizeof(float) * input_size * output_size);
-        std::memset(grad_biases, 0, sizeof(float) * output_size);
-
-        // Compute gradient of biases
-        for (int i = 0; i < batch_size; ++i)
-        {
-            for (int j = 0; j < output_size; ++j)
-            {
-                grad_biases[j] += grad_output[i * output_size + j];
-            }
-        }
-        if (input != nullptr)
-        {
-            // Compute gradient of weights
-            for (int i = 0; i < batch_size; ++i)
-            {
-                for (int j = 0; j < output_size; ++j)
-                {
-                    for (int k = 0; k < input_size; ++k)
-                    {
-                        grad_weights[k * output_size + j] += input[i * input_size + k] * grad_output[i * output_size + j];
-                    }
-                }
-            }
-        }
-
-        // Compute gradient of input
-        matmul(grad_output, weights, grad_input, batch_size, output_size, input_size);
-    }
+    void backward(const float *input, const float *grad_output, float *grad_input);
 };
 
-void model_forward(const float *input, int input_size, float *output, Dense layers[], int num_dense)
-{
-    // Allocate a temporary array for intermediate results
-    float *x = new float[layers[0].get_batch_size() * layers[0].get_output_size()];
-    layers[0].forward(input, x);
-
-    for (int i = 1; i < num_dense; ++i)
-    {
-        int batch_size = layers[i].get_batch_size();
-        int output_size = layers[i].get_output_size();
-
-        float *tmp_x = new float[batch_size * output_size];
-        layers[i].forward(x, tmp_x);
-
-        delete[] x;
-        x = tmp_x;
-    }
-
-    // Copy the final result to the output array
-    int final_batch_size = layers[num_dense - 1].get_batch_size();
-    int final_output_size = layers[num_dense - 1].get_output_size();
-    std::memcpy(output, x, sizeof(float) * final_batch_size * final_output_size);
-
-    // Free memory
-    delete[] x;
-}
-
-void model_backward(const float *input, int input_size, const float *output_grad, Dense layers[], int num_dense, float *input_grad)
-{
-    // Allocate memory for intermediate gradients
-    float *current_grad = new float[layers[num_dense - 1].get_batch_size() * layers[num_dense - 1].get_output_size()];
-    std::memcpy(current_grad, output_grad, sizeof(float) * layers[num_dense - 1].get_batch_size() * layers[num_dense - 1].get_output_size());
-
-    for (int i = num_dense - 1; i >= 0; --i)
-    {
-        float *prev_grad = new float[layers[i].get_batch_size() * layers[i].get_input_size()];
-        layers[i].backward((i == 0 ? input : nullptr), current_grad, prev_grad);
-
-        delete[] current_grad;
-        current_grad = prev_grad;
-    }
-
-    // Copy the final gradient to the input_grad array
-    std::memcpy(input_grad, current_grad, sizeof(float) * layers[0].get_batch_size() * layers[0].get_input_size());
-
-    // Free memory
-    delete[] current_grad;
-}
+#endif 
