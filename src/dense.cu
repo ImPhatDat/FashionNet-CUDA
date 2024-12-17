@@ -52,6 +52,14 @@ Dense &Dense::operator=(const Dense &other)
     return *this;
 }
 
+Dense::~Dense()
+{
+    delete[] weights;
+    delete[] biases;
+    delete[] grad_weights;
+    delete[] grad_biases;
+}
+
 void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
 {
     std::uniform_real_distribution<float> dis(-1.0, 1.0); // Uniform distribution
@@ -95,10 +103,10 @@ void Dense::forward(const float *input, float *output) const
 void Dense::backward(const float *input, const float *grad_output, float *grad_input)
 {
     // Reset gradients
-    std::memset(grad_weights, 0, sizeof(float) * input_size * output_size);
-    std::memset(grad_biases, 0, sizeof(float) * output_size);
+    std::fill(grad_weights, grad_weights + input_size * output_size, 0);
+    std::fill(grad_biases, grad_biases + output_size, 0);
 
-    // Compute gradient of biases
+    // Gradient of biases
     for (int i = 0; i < batch_size; ++i)
     {
         for (int j = 0; j < output_size; ++j)
@@ -106,9 +114,10 @@ void Dense::backward(const float *input, const float *grad_output, float *grad_i
             grad_biases[j] += grad_output[i * output_size + j];
         }
     }
+
+    // Gradient of weights
     if (input != nullptr)
     {
-        // Compute gradient of weights
         for (int i = 0; i < batch_size; ++i)
         {
             for (int j = 0; j < output_size; ++j)
@@ -121,10 +130,34 @@ void Dense::backward(const float *input, const float *grad_output, float *grad_i
         }
     }
 
-    // Compute gradient of input
-    matmul(grad_output, weights, grad_input, batch_size, output_size, input_size);
+    // Apply activation derivative
+    for (int i = 0; i < batch_size; ++i)
+    {
+        for (int j = 0; j < output_size; ++j)
+        {
+            int index = i * output_size + j;
+            if (activation_type == "relu")
+                grad_output_with_activation[index] = grad_output[index] * (output[index] > 0 ? 1.0f : 0.0f);
+            else if (activation_type == "softmax")
+                grad_output_with_activation[index] = /* Add proper softmax derivative */;
+            else
+                grad_output_with_activation[index] = grad_output[index];
+        }
+    }
+
+    // Gradient of input
+    matmul(grad_output_with_activation, weights, grad_input, batch_size, output_size, input_size);
 }
 
+
+void Dense::update_weights(float learning_rate) {
+    for (int i = 0; i < input_size * output_size; ++i) {
+        weights[i] -= learning_rate * grad_weights[i];
+    }
+    for (int i = 0; i < output_size; ++i) {
+        biases[i] -= learning_rate * grad_biases[i];
+    }
+}
 
 void model_forward(const float *input, float *output, Dense* layers, int num_dense)
 {

@@ -32,6 +32,7 @@ public:
     Dense();
     Dense(int input_size, int output_size, int batch_size, std::string activation_type, std::mt19937 &gen);
     Dense &operator=(const Dense &other);
+    ~Dense();
 
     int get_input_size() const { return input_size; }
     int get_batch_size() const { return batch_size; }
@@ -41,20 +42,14 @@ public:
     float *get_grad_weights() const { return grad_weights; }
     float *get_grad_biases() const { return grad_biases; }
 
-    // Destructor
-    ~Dense()
-    {
-        delete[] weights;
-        delete[] biases;
-        delete[] grad_weights;
-        delete[] grad_biases;
-    }
-
     // Forward pass
     void forward(const float *input, float *output) const;
 
     // Backward pass
     void backward(const float *input, const float *grad_output, float *grad_input);
+
+    void update_weights(float learning_rate);
+
 };
 
 #endif 

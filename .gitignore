@@ -38,4 +38,4 @@
 
 .venv/
 .vscode/
-**tmp*.cpp
+**tmp*.cu
