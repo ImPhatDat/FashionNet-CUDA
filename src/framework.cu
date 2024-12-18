@@ -68,7 +68,7 @@ void matmul(const float *A, const float *B, float *C, int M, int K, int N)
 }
 
 // assume sum_over_batch
-float categorical_crossentropy_loss(uint8_t *y_true, float *y_pred, int batch_size, int num_classes)
+float categorical_crossentropy_loss(const uint8_t *y_true, const float *y_pred, int batch_size, int num_classes)
 {
     float total_loss = 0.0f;
     // Avoid log(0)
@@ -93,10 +93,9 @@ void categorical_crossentropy_gradient(const uint8_t *y_true, const float *y_pre
     for (int i = 0; i < batch_size; ++i) {
         int true_class = y_true[i];
         float predicted_prob = y_pred[i * num_classes + true_class];
-        predicted_prob = std::max(predicted_prob, epsilon);
 
-        // Compute gradient for the correct class
-        d_output[i * num_classes + true_class] = -1.0f / (predicted_prob * batch_size);
+        predicted_prob = std::max(predicted_prob, epsilon);
+        
     }
 }
 

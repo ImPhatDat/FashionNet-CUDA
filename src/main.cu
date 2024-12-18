@@ -100,6 +100,7 @@ int main(int argc, char **argv)
     std::cout << "Total train images: " << train_set.getImageCount() << std::endl;
     std::cout << "Total test images: " << test_set.getImageCount() << std::endl;
 
+    
     int total_images = train_set.getImageCount();
     int num_batches = total_images / BATCH_SIZE;
 
@@ -133,25 +134,25 @@ int main(int argc, char **argv)
         previous_size = DENSE_OUTPUT[i]; // Update input size for next layer
     }
 
-    for (int bi = 0; bi < num_batches; ++bi)
-    {
-        // Forward pass: compute outputs for the batch
-        model_forward(x_batches[bi], output_batches[bi], layers, NUM_LAYERS);
+    // for (int bi = 0; bi < num_batches; ++bi)
+    // {
+    //     // Forward pass: compute outputs for the batch
+    //     model_forward(x_batches[bi], output_batches[bi], layers, NUM_LAYERS);
 
-        // Calculate loss
-        float loss = categorical_crossentropy_loss(y_batches[bi], output_batches[bi], BATCH_SIZE, OUTPUT_SIZE);
-        std::cout << "Batch " << bi + 1 << "/" << num_batches << " Loss: " << loss << std::endl;
+    //     // Calculate loss
+    //     float loss = categorical_crossentropy_loss(y_batches[bi], output_batches[bi], BATCH_SIZE, OUTPUT_SIZE);
+    //     std::cout << "Batch " << bi + 1 << "/" << num_batches << " Loss: " << loss << std::endl;
 
-        // Compute gradient of the loss with respect to the output
-        float *d_output = new float[BATCH_SIZE * OUTPUT_SIZE];
-        //categorical_crossentropy_gradient(y_batches[bi], output_batches[bi], d_output, BATCH_SIZE, OUTPUT_SIZE);
+    //     // Compute gradient of the loss with respect to the output
+    //     float *d_output = new float[BATCH_SIZE * OUTPUT_SIZE];
+    //     //categorical_crossentropy_gradient(y_batches[bi], output_batches[bi], d_output, BATCH_SIZE, OUTPUT_SIZE);
 
         
 
-        delete[] d_output;
+    //     delete[] d_output;
 
-        break;
-    }
+    //     break;
+    // }
 
     // Deallocate
     for (size_t i = 0; i < num_batches; ++i)
