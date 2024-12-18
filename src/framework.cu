@@ -71,14 +71,13 @@ void matmul(const float *A, const float *B, float *C, int M, int K, int N)
 float categorical_crossentropy_loss(uint8_t *y_true, float *y_pred, int batch_size, int num_classes)
 {
     float total_loss = 0.0f;
-
+    // Avoid log(0)
+    const float epsilon = 1e-7f;
     for (int i = 0; i < batch_size; ++i)
     {
         int true_class = y_true[i];
         float predicted_prob = y_pred[i * num_classes + true_class];
 
-        // Avoid log(0) by clamping probabilities to a small positive value
-        const float epsilon = 1e-7f;
         predicted_prob = std::max(predicted_prob, epsilon);
         total_loss -= std::log(predicted_prob);
     }
@@ -86,19 +85,18 @@ float categorical_crossentropy_loss(uint8_t *y_true, float *y_pred, int batch_si
     return total_loss / batch_size;
 }
 
-void categorical_crossentropy_gradient_sparse(const uint8_t *y_true, const float *y_pred, float *d_output, int batch_size, int output_size)
+void categorical_crossentropy_gradient(const uint8_t *y_true, const float *y_pred, float *d_output, int batch_size, int num_classes)
 {
-    for (int i = 0; i < batch_size; ++i)
-    {
-        int true_label = y_true[i]; // Sparse label (e.g., 0, 1, 2, ...)
-        for (int j = 0; j < output_size; ++j)
-        {
-            d_output[i * output_size + j] = y_pred[i * output_size + j];
-            if (j == true_label)
-            {
-                d_output[i * output_size + j] -= 1.0f; // Subtract 1 for the true class
-            }
-        }
+    // Avoid division by zero
+    const float epsilon = 1e-7f;
+
+    for (int i = 0; i < batch_size; ++i) {
+        int true_class = y_true[i];
+        float predicted_prob = y_pred[i * num_classes + true_class];
+        predicted_prob = std::max(predicted_prob, epsilon);
+
+        // Compute gradient for the correct class
+        d_output[i * num_classes + true_class] = -1.0f / (predicted_prob * batch_size);
     }
 }
 

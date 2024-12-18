@@ -1,6 +1,8 @@
 #ifndef DENSE_H
 #define DENSE_H
 
+#include <stdio.h>
+#include <stdint.h>
 #include <iostream>
 #include <cmath>
 #include <algorithm>
@@ -46,7 +48,7 @@ public:
     void forward(const float *input, float *output) const;
 
     // Backward pass
-    void backward(const float *input, const float *grad_output, float *grad_input);
+    //void backward(const float *input, const float *grad_output, float *grad_input);
 
     void update_weights(float learning_rate);
 

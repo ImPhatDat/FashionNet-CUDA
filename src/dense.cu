@@ -100,54 +100,54 @@ void Dense::forward(const float *input, float *output) const
 
 
 // Backward pass
-void Dense::backward(const float *input, const float *grad_output, float *grad_input)
-{
-    // Reset gradients
-    std::fill(grad_weights, grad_weights + input_size * output_size, 0);
-    std::fill(grad_biases, grad_biases + output_size, 0);
+// void Dense::backward(const float *input, const float *grad_output, float *grad_input)
+// {
+//     // Reset gradients
+//     std::fill(grad_weights, grad_weights + input_size * output_size, 0);
+//     std::fill(grad_biases, grad_biases + output_size, 0);
 
-    // Gradient of biases
-    for (int i = 0; i < batch_size; ++i)
-    {
-        for (int j = 0; j < output_size; ++j)
-        {
-            grad_biases[j] += grad_output[i * output_size + j];
-        }
-    }
+//     // Gradient of biases
+//     for (int i = 0; i < batch_size; ++i)
+//     {
+//         for (int j = 0; j < output_size; ++j)
+//         {
+//             grad_biases[j] += grad_output[i * output_size + j];
+//         }
+//     }
 
-    // Gradient of weights
-    if (input != nullptr)
-    {
-        for (int i = 0; i < batch_size; ++i)
-        {
-            for (int j = 0; j < output_size; ++j)
-            {
-                for (int k = 0; k < input_size; ++k)
-                {
-                    grad_weights[k * output_size + j] += input[i * input_size + k] * grad_output[i * output_size + j];
-                }
-            }
-        }
-    }
+//     // Gradient of weights
+//     if (input != nullptr)
+//     {
+//         for (int i = 0; i < batch_size; ++i)
+//         {
+//             for (int j = 0; j < output_size; ++j)
+//             {
+//                 for (int k = 0; k < input_size; ++k)
+//                 {
+//                     grad_weights[k * output_size + j] += input[i * input_size + k] * grad_output[i * output_size + j];
+//                 }
+//             }
+//         }
+//     }
 
-    // Apply activation derivative
-    for (int i = 0; i < batch_size; ++i)
-    {
-        for (int j = 0; j < output_size; ++j)
-        {
-            int index = i * output_size + j;
-            if (activation_type == "relu")
-                grad_output_with_activation[index] = grad_output[index] * (output[index] > 0 ? 1.0f : 0.0f);
-            else if (activation_type == "softmax")
-                grad_output_with_activation[index] = /* Add proper softmax derivative */;
-            else
-                grad_output_with_activation[index] = grad_output[index];
-        }
-    }
+//     // Apply activation derivative
+//     for (int i = 0; i < batch_size; ++i)
+//     {
+//         for (int j = 0; j < output_size; ++j)
+//         {
+//             int index = i * output_size + j;
+//             if (activation_type == "relu")
+//                 grad_output_with_activation[index] = grad_output[index] * (output[index] > 0 ? 1.0f : 0.0f);
+//             else if (activation_type == "softmax")
+//                 grad_output_with_activation[index] = /* Add proper softmax derivative */;
+//             else
+//                 grad_output_with_activation[index] = grad_output[index];
+//         }
+//     }
 
-    // Gradient of input
-    matmul(grad_output_with_activation, weights, grad_input, batch_size, output_size, input_size);
-}
+//     // Gradient of input
+//     matmul(grad_output_with_activation, weights, grad_input, batch_size, output_size, input_size);
+// }
 
 
 void Dense::update_weights(float learning_rate) {
@@ -186,24 +186,24 @@ void model_forward(const float *input, float *output, Dense* layers, int num_den
     delete[] x;
 }
 
-void model_backward(const float *input, int input_size, const float *output_grad, Dense* layers, int num_dense, float *input_grad)
-{
-    // Allocate memory for intermediate gradients
-    float *current_grad = new float[layers[num_dense - 1].get_batch_size() * layers[num_dense - 1].get_output_size()];
-    std::memcpy(current_grad, output_grad, sizeof(float) * layers[num_dense - 1].get_batch_size() * layers[num_dense - 1].get_output_size());
+// void model_backward(const float *input, int input_size, const float *output_grad, Dense* layers, int num_dense, float *input_grad)
+// {
+//     // Allocate memory for intermediate gradients
+//     float *current_grad = new float[layers[num_dense - 1].get_batch_size() * layers[num_dense - 1].get_output_size()];
+//     std::memcpy(current_grad, output_grad, sizeof(float) * layers[num_dense - 1].get_batch_size() * layers[num_dense - 1].get_output_size());
 
-    for (int i = num_dense - 1; i >= 0; --i)
-    {
-        float *prev_grad = new float[layers[i].get_batch_size() * layers[i].get_input_size()];
-        layers[i].backward((i == 0 ? input : nullptr), current_grad, prev_grad);
+//     for (int i = num_dense - 1; i >= 0; --i)
+//     {
+//         float *prev_grad = new float[layers[i].get_batch_size() * layers[i].get_input_size()];
+//         layers[i].backward((i == 0 ? input : nullptr), current_grad, prev_grad);
 
-        delete[] current_grad;
-        current_grad = prev_grad;
-    }
+//         delete[] current_grad;
+//         current_grad = prev_grad;
+//     }
 
-    // Copy the final gradient to the input_grad array
-    std::memcpy(input_grad, current_grad, sizeof(float) * layers[0].get_batch_size() * layers[0].get_input_size());
+//     // Copy the final gradient to the input_grad array
+//     std::memcpy(input_grad, current_grad, sizeof(float) * layers[0].get_batch_size() * layers[0].get_input_size());
 
-    // Free memory
-    delete[] current_grad;
-}
+//     // Free memory
+//     delete[] current_grad;
+// }

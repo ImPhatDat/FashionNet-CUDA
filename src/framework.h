@@ -19,8 +19,8 @@ void softmax(float *input, int rows, int cols);
 void matmul(const float *A, const float *B, float *C, int M, int K, int N);
 
 // assume sum_over_batch
-float categorical_crossentropy_loss(uint8_t *y_true, float *y_pred, int batch_size, int num_classes);
-void categorical_crossentropy_gradient(uint8_t* y_true, float* y_pred, float* d_output, int batch_size, int output_size);
+float categorical_crossentropy_loss(const uint8_t *y_true, float *y_pred, int batch_size, int num_classes);
+void categorical_crossentropy_gradient(const uint8_t* y_true, float* y_pred, float* d_output, int batch_size, int num_classes);
 
 
 

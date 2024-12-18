@@ -144,9 +144,13 @@ int main(int argc, char **argv)
 
         // Compute gradient of the loss with respect to the output
         float *d_output = new float[BATCH_SIZE * OUTPUT_SIZE];
-        categorical_crossentropy_gradient_sparse(y_batches[bi], output_batches[bi], d_output, BATCH_SIZE, OUTPUT_SIZE);
+        //categorical_crossentropy_gradient(y_batches[bi], output_batches[bi], d_output, BATCH_SIZE, OUTPUT_SIZE);
 
-        // model_backward(x_batches[bi], INPUT_SIZE, d_output, layers, NUM_LAYERS, )
+        
+
+        delete[] d_output;
+
+        break;
     }
 
     // Deallocate
