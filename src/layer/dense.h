@@ -10,19 +10,17 @@
 #include <cstring>
 #include <cmath>
 #include <random>
-#include "framework.h"
+#include "layer.h"
+
 #pragma once
 
 void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen);
 
-class Dense
+void matmul(const float *A, const float *B, float *C, int M, int K, int N);
+
+class Dense : public Layer
 {
 private:
-    int input_size = 0;
-    int output_size = 0;
-    int batch_size = 0;
-    std::string activation_type = "none";
-
     float *weights = nullptr; // 1D array to represent weights (row-major)
     float *biases = nullptr;  // 1D array to represent biases
 
@@ -32,25 +30,18 @@ private:
 
 public:
     Dense();
-    Dense(int input_size, int output_size, int batch_size, std::string activation_type, std::mt19937 &gen);
-    Dense &operator=(const Dense &other);
+    Dense(int batch_size, int input_size, int output_size, std::mt19937 &gen);
     ~Dense();
 
-    int get_input_size() const { return input_size; }
-    int get_batch_size() const { return batch_size; }
-    int get_output_size() const { return output_size; }
     float *get_weights() const { return weights; }
     float *get_biases() const { return biases; }
     float *get_grad_weights() const { return grad_weights; }
     float *get_grad_biases() const { return grad_biases; }
 
-    // Forward pass
-    void forward(const float *input, float *output) const;
+    void forward(const float *input, float *output);
+    void backward(const float *output_d, float *input_d);
 
-    // Backward pass
-    //void backward(const float *input, const float *grad_output, float *grad_input);
-
-    void update_weights(float learning_rate);
+    void update_weights_and_biases(float learning_rate);
 
 };
 
