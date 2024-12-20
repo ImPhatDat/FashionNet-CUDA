@@ -4,13 +4,12 @@
 #include "layer.h"
 #include <cmath>
 #include <algorithm>
+#pragma once
 
 class Softmax : public Layer
 {
 public:
-    Softmax() {}
-    ~Softmax() {}
-
+    Softmax(int batch_size, int input_size);
     void forward(const float *input, float *output) override;
     void backward(const float *output_d, float *input_d) override;
 };

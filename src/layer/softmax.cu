@@ -1,5 +1,12 @@
 #include "softmax.h"
 
+Softmax::Softmax(int batch_size, int input_size)
+    : Layer(batch_size, input_size, input_size) // Reuse parent constructor
+{
+    this->name = "softmax";
+}
+
+
 void Softmax::forward(const float *input, float *output)
 {
     for (int b = 0; b < batch_size; ++b)

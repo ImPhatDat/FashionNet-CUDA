@@ -24,8 +24,8 @@ public:
     Loss();
     virtual ~Loss();
 
-    virtual float forward(const uint8_t *y_true, const float *y_pred, int batch_size, int num_classes);
-    virtual void backward(const uint8_t *y_true, const float *y_pred, int batch_size, int num_classes, float *gradients);
+    virtual float forward(const uint8_t *y_true, const float *y_pred, int batch_size, int num_classes) = 0;
+    virtual void backward(const uint8_t *y_true, const float *y_pred, int batch_size, int num_classes, float *gradients) = 0;
 };
 
 #endif

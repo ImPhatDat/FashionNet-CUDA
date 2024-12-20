@@ -29,7 +29,6 @@ private:
     float *grad_biases = nullptr;
 
 public:
-    Dense();
     Dense(int batch_size, int input_size, int output_size, std::mt19937 &gen);
     ~Dense();
 
@@ -40,8 +39,7 @@ public:
 
     void forward(const float *input, float *output);
     void backward(const float *output_d, float *input_d);
-
-    void update_weights_and_biases(float learning_rate);
+    void update_weights(const float learning_rate) override;
 
 };
 

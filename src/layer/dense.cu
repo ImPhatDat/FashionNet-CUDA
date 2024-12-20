@@ -32,17 +32,9 @@ void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt
     }
 }
 
-// Default Constructor
-Dense::Dense()
+Dense::Dense(int batch_size, int input_size, int output_size, std::mt19937 &gen) : Layer(batch_size, input_size, output_size)
 {
-    this->weights = nullptr;
-    this->biases = nullptr;
-    this->grad_weights = nullptr;
-    this->grad_biases = nullptr;
-}
-
-Dense::Dense(int batch_size, int input_size, int output_size, std::mt19937 &gen)
-{
+    this->name = "dense";
     // Allocate and initialize weights and biases
     weights = new float[input_size * output_size];
     biases = new float[output_size];
@@ -94,7 +86,7 @@ void Dense::backward(const float *output_d, float *input_d)
     matmul(output_d, weights, input_d, batch_size, output_size, input_size);
 }
 
-void Dense::update_weights_and_biases(float learning_rate)
+void Dense::update_weights(float learning_rate)
 {
     // Update weights
     for (int i = 0; i < input_size * output_size; ++i)

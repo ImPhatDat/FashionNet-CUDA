@@ -1,6 +1,6 @@
 #include "categorical_crossentropy.h"
 
-CategoricalCrossentropy::CategoricalCrossentropy(float epsilon = 1e-7): epsilon(epsilon) {}
+CategoricalCrossentropy::CategoricalCrossentropy(float epsilon): epsilon(epsilon) {}
 
 CategoricalCrossentropy::~CategoricalCrossentropy() {}
 

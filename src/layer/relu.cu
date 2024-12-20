@@ -1,5 +1,11 @@
 #include "relu.h"
 
+ReLU::ReLU(int batch_size, int input_size)
+    : Layer(batch_size, input_size, input_size) // Reuse parent constructor
+{
+    this->name = "relu";
+}
+
 void ReLU::forward(const float *input, float *output)
 {
     int total_size = batch_size * input_size;
