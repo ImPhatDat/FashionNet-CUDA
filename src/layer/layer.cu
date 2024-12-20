@@ -15,4 +15,7 @@ Layer::~Layer()
     delete[] output;
 }
 
+float* Layer::get_weights() const { return nullptr; }
+float* Layer::get_biases() const { return nullptr; }
+
 void Layer::update_weights(const float learning_rate) {}

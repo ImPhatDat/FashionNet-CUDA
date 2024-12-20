@@ -17,6 +17,7 @@
 void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen);
 
 void matmul(const float *A, const float *B, float *C, int M, int K, int N);
+void transpose(const float *in, float *out, int M, int N);
 
 class Dense : public Layer
 {
@@ -32,8 +33,8 @@ public:
     Dense(int batch_size, int input_size, int output_size, std::mt19937 &gen);
     ~Dense();
 
-    float *get_weights() const { return weights; }
-    float *get_biases() const { return biases; }
+    float *get_weights() const override { return weights; }
+    float *get_biases() const override { return biases; }
     float *get_grad_weights() const { return grad_weights; }
     float *get_grad_biases() const { return grad_biases; }
 

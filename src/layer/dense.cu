@@ -15,6 +15,16 @@ void matmul(const float *A, const float *B, float *C, int M, int K, int N)
         }
 }
 
+void transpose(const float *in, float *out, int M, int N) {
+    for (int i = 0; i < M; ++i) {
+        for (int j = 0; j < N; ++j) {
+            // Transpose by swapping rows and columns
+            out[j * M + i] = in[i * N + j];
+        }
+    }
+}
+
+
 void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
 {
     std::uniform_real_distribution<float> dis(-1.0, 1.0); // Uniform distribution
@@ -56,6 +66,7 @@ Dense::~Dense()
 // Forward pass
 void Dense::forward(const float *input, float *output)
 {
+    std::memcpy(this->input, input, sizeof(float) * this->batch_size * this->input_size);
     matmul(input, weights, output, this->batch_size, this->input_size, this->output_size);
     for (int i = 0; i < this->batch_size; ++i)
     {
@@ -69,8 +80,15 @@ void Dense::forward(const float *input, float *output)
 // Backward pass
 void Dense::backward(const float *output_d, float *input_d)
 {
+    // Initialize gradients to zero
+    std::fill(grad_weights, grad_weights + input_size * output_size, 0.0f);
+    std::fill(grad_biases, grad_biases + output_size, 0.0f);
+
     // Compute grad_weights: input^T * output_d
-    matmul(input_d, output_d, grad_weights, input_size, batch_size, output_size);
+    float* tmp_tranpose = new float[this->batch_size * this->input_size];
+    transpose(this->input, tmp_tranpose, this->batch_size, this->input_size);
+    matmul(tmp_tranpose, output_d, grad_weights, input_size, batch_size, output_size);
+    delete[] tmp_tranpose;
 
     // Compute grad_biases: sum over batch_size
     std::fill(grad_biases, grad_biases + output_size, 0.0f);
@@ -83,7 +101,10 @@ void Dense::backward(const float *output_d, float *input_d)
     }
 
     // Compute input_d: output_d * weights^T
-    matmul(output_d, weights, input_d, batch_size, output_size, input_size);
+    tmp_tranpose = new float[this->input_size * this->output_size];
+    transpose(this->weights, tmp_tranpose, this->input_size, this->output_size);
+    matmul(output_d, tmp_tranpose, input_d, batch_size, output_size, input_size);
+    delete[] tmp_tranpose;
 }
 
 void Dense::update_weights(float learning_rate)

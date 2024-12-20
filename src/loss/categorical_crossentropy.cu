@@ -36,6 +36,7 @@ void CategoricalCrossentropy::backward(const uint8_t *y_true, const float *y_pre
         for (int c = 0; c < num_classes; ++c)
         {
             grad_row[c] = (c == label ? -1.0f / (pred_row[c] + this->epsilon) : 0.0f);
+            // grad_row[c] = (pred_row[c] - (c == label));
         }
     }
 }

@@ -18,10 +18,10 @@ const std::string test_labelFilePath = "data/fashion-mnist/t10k-labels-idx1-ubyt
 std::mt19937 global_rng(1); // Random number generator
 // Model configurations
 const int INPUT_SIZE = 784; // Example: MNIST image input size
-const int BATCH_SIZE = 64;
+const int BATCH_SIZE = 16;
 const int OUTPUT_SIZE = 10;
 
-const float LEARNING_RATE = 0.1;
+const float LEARNING_RATE = 1;
 
 Layer* layers[] = {
     new Dense(BATCH_SIZE, INPUT_SIZE, 128, global_rng),
@@ -79,6 +79,17 @@ int main(int argc, char **argv)
         model.backward(y_batches[bi], y_pred_batches[bi], &loss_obj);
 
         model.update_weights(LEARNING_RATE);
+        
+        //tmp
+
+        model.forward(x_batches[bi], y_pred_batches[bi]);
+        
+        loss = loss_obj.forward(y_batches[bi], y_pred_batches[bi], BATCH_SIZE, OUTPUT_SIZE);
+
+        std::cout << "Loss for batch " << bi << ": " << loss << std::endl;
+
+
+        break;
     } 
 
     // Deallocate

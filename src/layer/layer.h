@@ -22,6 +22,8 @@ public:
     
     virtual void forward(const float *input, float *output) = 0;
     virtual void backward(const float *output_d, float *input_d) = 0;
+    virtual float* get_weights() const;
+    virtual float* get_biases() const;
     virtual void update_weights(const float learning_rate);
 };
 
