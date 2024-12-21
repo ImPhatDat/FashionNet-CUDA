@@ -31,6 +31,15 @@ void Model::forward(const float* batch_input, float* batch_output) {
         int next_output_size = this->layers[i]->output_size;
         tmp_x = new float[this->batch_size * next_output_size];
         this->layers[i]->forward(x, tmp_x);
+
+        // std::cout << "layer " << i << std::endl;
+        // for (int ii = 0; ii < this->batch_size; ii++) {
+        //     for (int jj = 0; jj < 10; jj++) {
+        //         std::cout << tmp_x[ii * next_output_size + jj] << " ";
+        //     }
+        //     std::cout << std::endl;
+        // }
+
         delete[] x;
         x = tmp_x;
     }
@@ -55,6 +64,27 @@ void Model::backward(const uint8_t* y_true, const float* y_pred, Loss* loss) {
 
 void Model::update_weights(const float learning_rate) {
     for (int i = 0; i < this->num_layers; i++) {
+
+        // if (this->layers[i]->name == "dense") {
+        //     std::cout << "input" << std::endl;
+        //     for (int ii = 0; ii < 10; ii++) {
+        //         for (int jj = 0; jj < 10; jj++) {
+        //             std::cout << this->layers[i]->get_weights()[ii * this->layers[i]->output_size + jj] << " ";
+        //         }
+        //         std::cout << std::endl;
+        //     }
+        // }
+
         this->layers[i]->update_weights(learning_rate);
+
+        // if (this->layers[i]->name == "dense") {
+        //     std::cout << "input" << std::endl;
+        //     for (int ii = 0; ii < 10; ii++) {
+        //         for (int jj = 0; jj < 10; jj++) {
+        //             std::cout << this->layers[i]->get_weights()[ii * this->layers[i]->output_size + jj] << " ";
+        //         }
+        //         std::cout << std::endl;
+        //     }
+        // }
     }
 }

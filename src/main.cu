@@ -71,24 +71,11 @@ int main(int argc, char **argv)
 
     for (int bi = 0; bi < num_batches; ++bi) {
         model.forward(x_batches[bi], y_pred_batches[bi]);
-        
         float loss = loss_obj.forward(y_batches[bi], y_pred_batches[bi], BATCH_SIZE, OUTPUT_SIZE);
-
         std::cout << "Loss for batch " << bi << ": " << loss << std::endl;
 
         model.backward(y_batches[bi], y_pred_batches[bi], &loss_obj);
-
         model.update_weights(LEARNING_RATE);
-        
-        //tmp
-
-        model.forward(x_batches[bi], y_pred_batches[bi]);
-        
-        loss = loss_obj.forward(y_batches[bi], y_pred_batches[bi], BATCH_SIZE, OUTPUT_SIZE);
-
-        std::cout << "Loss for batch " << bi << ": " << loss << std::endl;
-
-
         break;
     } 
 

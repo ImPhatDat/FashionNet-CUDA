@@ -16,7 +16,6 @@ void Softmax::forward(const float *input, float *output)
 
         // Numerical stability
         float max_val = *std::max_element(input_row, input_row + input_size);
-
         // Compute exponentials and their sum
         float sum_exp = 0.0f;
         for (int c = 0; c < input_size; ++c)

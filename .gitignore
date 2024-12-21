@@ -39,3 +39,4 @@
 .venv/
 .vscode/
 **tmp*.cu
+obj/

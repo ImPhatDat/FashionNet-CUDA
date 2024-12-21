@@ -15,30 +15,40 @@ void matmul(const float *A, const float *B, float *C, int M, int K, int N)
         }
 }
 
-void transpose(const float *in, float *out, int M, int N) {
-    for (int i = 0; i < M; ++i) {
-        for (int j = 0; j < N; ++j) {
+void transpose(const float *in, float *out, int M, int N)
+{
+    for (int i = 0; i < M; ++i)
+    {
+        for (int j = 0; j < N; ++j)
+        {
             // Transpose by swapping rows and columns
             out[j * M + i] = in[i * N + j];
         }
     }
 }
 
-
+// glorot uniform
 void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
 {
-    std::uniform_real_distribution<float> dis(-1.0, 1.0); // Uniform distribution
+    // Calculate the Glorot Uniform limit
+    float limit = std::sqrt(6.0f / (rows + cols)); 
+
+    // Create a uniform distribution between -limit and +limit
+    std::uniform_real_distribution<float> dis(-limit, limit);
+
+    // Initialize weights
     for (int i = 0; i < rows; ++i)
     {
         for (int j = 0; j < cols; ++j)
         {
-            weights[i * cols + j] = dis(gen); // Random value between -1 and 1
+            weights[i * cols + j] = dis(gen);
         }
     }
 
+    // Initialize biases to 0
     for (int j = 0; j < cols; ++j)
     {
-        biases[j] = 0; // Set biases to 0
+        biases[j] = 0.0f;
     }
 }
 
@@ -85,7 +95,7 @@ void Dense::backward(const float *output_d, float *input_d)
     std::fill(grad_biases, grad_biases + output_size, 0.0f);
 
     // Compute grad_weights: input^T * output_d
-    float* tmp_tranpose = new float[this->batch_size * this->input_size];
+    float *tmp_tranpose = new float[this->batch_size * this->input_size];
     transpose(this->input, tmp_tranpose, this->batch_size, this->input_size);
     matmul(tmp_tranpose, output_d, grad_weights, input_size, batch_size, output_size);
     delete[] tmp_tranpose;
