@@ -31,7 +31,7 @@ int main(int argc, char **argv)
     int opt;
 
     // Parsing command-line arguments
-    while ((opt = getopt(argc, argv, "e:b:l:p")) != -1)
+    while ((opt = getopt(argc, argv, "e:b:l:p:")) != -1)
     {
         switch (opt)
         {
@@ -103,6 +103,8 @@ int main(int argc, char **argv)
     std::cout << "\tNum epoch: " << num_epoch << std::endl;
     std::cout << "\tBatch size: " << batch_size << std::endl;
     std::cout << "\tLearning rate: " << learning_rate << std::endl;
+    std::cout << "\tCheckpoint: " << checkpoint_path << std::endl;
+
 
     HostTimer epoch_timer;
     HostTimer total_timer;
@@ -160,7 +162,7 @@ int main(int argc, char **argv)
     if (checkpoint_path != "")
         model.save_weights(checkpoint_path);
 
-    // DONT DELETE ABOVE COMMENTED CODE (for verify if loaded correct)
+    // DONT DELETE COMMENTED CODE BELOW  (for verify)
 
     // Layer *layers2[] = {
     // new Dense(batch_size, INPUT_SIZE, 128, global_rng),
