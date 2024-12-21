@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <random>
+#include <chrono>
 #include "fashion_mnist.h"
 #include "Model/Model.h"
 #include "layer/dense.h"
@@ -18,7 +19,7 @@ const std::string test_labelFilePath = "data/fashion-mnist/t10k-labels-idx1-ubyt
 std::mt19937 global_rng(1); // Random number generator
 // Model configurations
 const int INPUT_SIZE = 784; // Example: MNIST image input size
-const int BATCH_SIZE = 64;
+const int BATCH_SIZE = 128;
 const int OUTPUT_SIZE = 10;
 
 const float LEARNING_RATE = 0.001;
@@ -74,8 +75,13 @@ int main(int argc, char **argv)
     CategoricalCrossentropy loss_obj(1e-7);
     Accuracy acc_obj;
     float loss_batch;
+
+    HostTimer epoch_timer;
     for (int epoch = 0; epoch < NUM_EPOCHS; epoch++)
     {
+        // Start timing
+        epoch_timer.Start();
+
         printf("====================Epoch (%d/%d)====================\n", epoch + 1, NUM_EPOCHS);
         // reshuffle train after each epoch
         train_set.shuffle(global_rng);
@@ -111,6 +117,12 @@ int main(int argc, char **argv)
             acc_obj.update_state(test_y_pred_batches[bi], test_y_batches[bi], BATCH_SIZE, OUTPUT_SIZE);
         }
         printf("Validation: loss - %f, acc - %f\n", loss_obj.compute_average_loss(), acc_obj.compute());
+
+        // Stop timing
+        epoch_timer.Stop();
+
+        // Get and print the elapsed time
+        printf("Epoch time: %f seconds\n", epoch_timer.Elapsed());
     }
 
     // Deallocate
