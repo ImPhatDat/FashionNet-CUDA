@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <random>
 #include <chrono>
+#include <getopt.h>
 #include "fashion_mnist.h"
 #include "Model/Model.h"
 #include "layer/dense.h"
@@ -24,8 +25,6 @@ const int OUTPUT_SIZE = 10;
 
 const float LEARNING_RATE = 0.001;
 
-const int NUM_EPOCHS = 10;
-
 Layer *layers[] = {
     new Dense(BATCH_SIZE, INPUT_SIZE, 128, global_rng),
     new ReLU(BATCH_SIZE, 128),
@@ -38,6 +37,21 @@ const int NUM_LAYERS = sizeof(layers) / sizeof(layers[0]);
 
 int main(int argc, char **argv)
 {
+    int num_epoch = 10;
+    int opt;
+
+    // Parsing command-line arguments
+    while ((opt = getopt(argc, argv, "e:")) != -1) {
+        switch (opt) {
+            case 'e':
+                num_epoch = atoi(optarg); // Convert argument to integer
+                break;
+            default:
+                fprintf(stderr, "Usage: %s [-e num_epoch]\n", argv[0]);
+                exit(EXIT_FAILURE);
+        }
+    }
+
     printDeviceInfo();
 
     // Load dataset
@@ -77,12 +91,12 @@ int main(int argc, char **argv)
     float loss_batch;
 
     HostTimer epoch_timer;
-    for (int epoch = 0; epoch < NUM_EPOCHS; epoch++)
+    for (int epoch = 0; epoch < num_epoch; epoch++)
     {
         // Start timing
         epoch_timer.Start();
 
-        printf("====================Epoch (%d/%d)====================\n", epoch + 1, NUM_EPOCHS);
+        printf("====================Epoch (%d/%d)====================\n", epoch + 1, num_epoch);
         // reshuffle train after each epoch
         train_set.shuffle(global_rng);
         train_set.prepareBatchesWithLabels(BATCH_SIZE, INPUT_SIZE, x_batches, y_batches);
@@ -126,7 +140,7 @@ int main(int argc, char **argv)
     }
 
     // Deallocate
-    for (size_t i = 0; i < num_batches; ++i)
+    for (int i = 0; i < num_batches; ++i)
     {
         delete[] x_batches[i];
         delete[] y_pred_batches[i];
@@ -136,7 +150,7 @@ int main(int argc, char **argv)
     delete[] y_pred_batches;
     delete[] y_batches;
 
-    for (size_t i = 0; i < test_num_batches; ++i)
+    for (int i = 0; i < test_num_batches; ++i)
     {
         delete[] test_x_batches[i];
         delete[] test_y_pred_batches[i];
