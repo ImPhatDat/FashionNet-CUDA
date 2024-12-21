@@ -49,7 +49,7 @@ public:
     size_t getImageCount() const;
     const Image &getImage(size_t index) const;
     void shuffle(std::mt19937 randomGenerator);
-    void prepareBatchesWithLabels(int batch_size, int input_size, float **&batches, uint8_t **&batch_labels);
+    void prepareBatchesWithLabels(int batch_size, int input_size, float **batches, uint8_t **batch_labels);
 };
 
 #endif // FASHION_MNIST_H

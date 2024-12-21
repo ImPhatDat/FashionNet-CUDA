@@ -222,18 +222,13 @@ void FashionMnist::shuffle(std::mt19937 randomGenerator)
     std::shuffle(images, images + imageCount, randomGenerator);
 }
 
-void FashionMnist::prepareBatchesWithLabels(int batch_size, int input_size, float **&batches, uint8_t **&batch_labels)
+void FashionMnist::prepareBatchesWithLabels(int batch_size, int input_size, float **batches, uint8_t **batch_labels)
 {
     size_t total_images = this->getImageCount();
     size_t num_batches = total_images / batch_size;
 
-    batches = new float *[num_batches];
-    batch_labels = new uint8_t *[num_batches];
-
     for (size_t batch = 0; batch < num_batches; ++batch)
     {
-        batches[batch] = new float[batch_size * input_size];
-        batch_labels[batch] = new uint8_t[batch_size];
 
         for (int i = 0; i < batch_size; ++i)
         {
