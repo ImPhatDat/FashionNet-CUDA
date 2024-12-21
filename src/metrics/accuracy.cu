@@ -1,4 +1,4 @@
-#include "accuracy.h"
+#include "accuracy.hh"
 #include <stdexcept>
 
 // External argmax function definition

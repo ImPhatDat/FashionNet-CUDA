@@ -1,4 +1,4 @@
-#include "layer.h"
+#include "layer.hh"
 
 Layer::Layer(int batch_size, int input_size, int output_size) {
     this->batch_size = batch_size;
@@ -19,3 +19,5 @@ float* Layer::get_weights() const { return nullptr; }
 float* Layer::get_biases() const { return nullptr; }
 
 void Layer::update_weights(const float learning_rate) {}
+
+void Layer::load_weights(const float* weights, const float* biases) {}

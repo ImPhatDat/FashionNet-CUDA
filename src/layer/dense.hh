@@ -10,7 +10,7 @@
 #include <cstring>
 #include <cmath>
 #include <random>
-#include "layer.h"
+#include "layer.hh"
 
 #pragma once
 
@@ -41,6 +41,8 @@ public:
     void forward(const float *input, float *output);
     void backward(const float *output_d, float *input_d);
     void update_weights(const float learning_rate) override;
+
+    void load_weights(const float* weights, const float* biases) override;
 
 };
 

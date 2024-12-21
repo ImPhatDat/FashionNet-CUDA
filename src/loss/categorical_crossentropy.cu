@@ -1,4 +1,4 @@
-#include "categorical_crossentropy.h"
+#include "categorical_crossentropy.hh"
 
 CategoricalCrossentropy::CategoricalCrossentropy(float epsilon) : epsilon(epsilon) {}
 

@@ -1,7 +1,7 @@
 #ifndef RELU_H
 #define RELU_H
 
-#include "layer.h"
+#include "layer.hh"
 #include <algorithm>
 #pragma once
 

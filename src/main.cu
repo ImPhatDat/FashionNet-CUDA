@@ -3,13 +3,13 @@
 #include <random>
 #include <chrono>
 #include <getopt.h>
-#include "fashion_mnist.h"
-#include "Model/Model.h"
-#include "layer/dense.h"
-#include "layer/relu.h"
-#include "layer/softmax.h"
-#include "loss/categorical_crossentropy.h"
-#include "metrics/accuracy.h"
+#include "fashion_mnist.hh"
+#include "Model/Model.hh"
+#include "layer/dense.hh"
+#include "layer/relu.hh"
+#include "layer/softmax.hh"
+#include "loss/categorical_crossentropy.hh"
+#include "metrics/accuracy.hh"
 #include "helpers.cu"
 
 const std::string train_imageFilePath = "data/fashion-mnist/train-images-idx3-ubyte";
@@ -27,10 +27,11 @@ int main(int argc, char **argv)
     int num_epoch = 10;
     int batch_size = 64; // Default value
     float learning_rate = 0.001;
+    std::string checkpoint_path = "";
     int opt;
 
     // Parsing command-line arguments
-    while ((opt = getopt(argc, argv, "e:b:l:")) != -1)
+    while ((opt = getopt(argc, argv, "e:b:l:p")) != -1)
     {
         switch (opt)
         {
@@ -43,8 +44,11 @@ int main(int argc, char **argv)
         case 'l':
             learning_rate = atof(optarg); // Convert argument to integer
             break;
+        case 'p':
+            checkpoint_path = optarg; // Store the checkpoint path
+            break;
         default:
-            fprintf(stderr, "Usage: %s [-e num_epoch] [-b batchsize] [-l learning_rate]\n", argv[0]);
+            fprintf(stderr, "Usage: %s [-e num_epoch] [-b batchsize] [-l learning_rate] [-p checkpoint_path]\n", argv[0]);
             exit(EXIT_FAILURE);
         }
     }
@@ -101,6 +105,8 @@ int main(int argc, char **argv)
     std::cout << "\tLearning rate: " << learning_rate << std::endl;
 
     HostTimer epoch_timer;
+    HostTimer total_timer;
+    total_timer.Start();
     for (int epoch = 0; epoch < num_epoch; epoch++)
     {
         // Start timing
@@ -148,6 +154,43 @@ int main(int argc, char **argv)
         // Get and print the elapsed time
         printf("Epoch time: %f seconds\n", epoch_timer.Elapsed());
     }
+    total_timer.Stop();
+    printf("Total time: %f seconds\n", total_timer.Elapsed());
+
+    if (checkpoint_path != "")
+        model.save_weights(checkpoint_path);
+
+    // DONT DELETE ABOVE COMMENTED CODE (for verify if loaded correct)
+
+    // Layer *layers2[] = {
+    // new Dense(batch_size, INPUT_SIZE, 128, global_rng),
+    // new ReLU(batch_size, 128),
+    // new Dense(batch_size, 128, 128, global_rng),
+    // new ReLU(batch_size, 128),
+    // new Dense(batch_size, 128, OUTPUT_SIZE, global_rng),
+    // new Softmax(batch_size, OUTPUT_SIZE)};
+    // Model model2(layers2, NUM_LAYERS, batch_size, INPUT_SIZE, OUTPUT_SIZE);
+    // model2.load_weights("weight_ne.bin");
+    // float* tmp_batch = new float[batch_size * OUTPUT_SIZE];
+    // model2.forward(test_x_batches[0], tmp_batch);
+    // std::cout << "Ori preds" << std::endl;
+    // for (int ii = 0; ii < batch_size; ii++) {
+    //     for (int jj = 0; jj < OUTPUT_SIZE; jj++) {
+    //         std::cout << test_y_pred_batches[0][ii * OUTPUT_SIZE + jj] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
+    // std::cout << "Loaded preds" << std::endl;
+    // for (int ii = 0; ii < batch_size; ii++) {
+    //     for (int jj = 0; jj < OUTPUT_SIZE; jj++) {
+    //         std::cout << tmp_batch[ii * OUTPUT_SIZE + jj] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
+
+    // delete[] tmp_batch;
+
+
 
     // Deallocate
     for (int i = 0; i < num_batches; ++i)

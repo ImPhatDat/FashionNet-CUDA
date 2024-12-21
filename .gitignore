@@ -40,3 +40,4 @@
 .vscode/
 **tmp*.cu
 obj/
+**.bin

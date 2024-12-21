@@ -9,7 +9,7 @@
 #include <string>
 #include <cstring>
 #include <cmath>
-#include "loss.h"
+#include "loss.hh"
 #pragma once
 
 

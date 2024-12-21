@@ -1,7 +1,7 @@
 #ifndef SOFTMAX_H
 #define SOFTMAX_H
 
-#include "layer.h"
+#include "layer.hh"
 #include <cmath>
 #include <algorithm>
 #pragma once

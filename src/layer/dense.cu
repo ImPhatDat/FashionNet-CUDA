@@ -1,4 +1,4 @@
-#include "dense.h"
+#include "dense.hh"
 
 void matmul(const float *A, const float *B, float *C, int M, int K, int N)
 {
@@ -129,5 +129,15 @@ void Dense::update_weights(float learning_rate)
     for (int i = 0; i < output_size; ++i)
     {
         biases[i] -= learning_rate * grad_biases[i];
+    }
+}
+
+void Dense::load_weights(const float* weights, const float* biases) {
+    if (weights != nullptr && biases != nullptr) {
+        std::memcpy(this->weights, weights, sizeof(float) * this->input_size * this->output_size);
+        std::memcpy(this->biases, biases, sizeof(float) * this->output_size);
+    }
+    else {
+        std::cerr << "Can't load weights with nullptr" << std::endl;
     }
 }

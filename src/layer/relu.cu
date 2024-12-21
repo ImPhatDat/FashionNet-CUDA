@@ -1,4 +1,4 @@
-#include "relu.h"
+#include "relu.hh"
 
 ReLU::ReLU(int batch_size, int input_size)
     : Layer(batch_size, input_size, input_size) // Reuse parent constructor

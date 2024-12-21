@@ -1,4 +1,4 @@
-#include "fashion_mnist.h"
+#include "fashion_mnist.hh"
 #include <fstream>
 #include <iostream>
 

@@ -1,4 +1,4 @@
-#include "loss.h"
+#include "loss.hh"
 #include <iostream>
 using namespace std;
 
