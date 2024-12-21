@@ -7,7 +7,8 @@
 #include "layer/relu.h"
 #include "layer/softmax.h"
 #include "loss/categorical_crossentropy.h"
-#include "cuda_utils.cu"
+#include "metrics/accuracy.h"
+#include "helpers.cu"
 
 
 const std::string train_imageFilePath = "data/fashion-mnist/train-images-idx3-ubyte";
@@ -18,10 +19,12 @@ const std::string test_labelFilePath = "data/fashion-mnist/t10k-labels-idx1-ubyt
 std::mt19937 global_rng(1); // Random number generator
 // Model configurations
 const int INPUT_SIZE = 784; // Example: MNIST image input size
-const int BATCH_SIZE = 16;
+const int BATCH_SIZE = 64;
 const int OUTPUT_SIZE = 10;
 
-const float LEARNING_RATE = 1;
+const float LEARNING_RATE = 0.001;
+
+const int NUM_EPOCHS = 10;
 
 Layer* layers[] = {
     new Dense(BATCH_SIZE, INPUT_SIZE, 128, global_rng),
@@ -68,16 +71,31 @@ int main(int argc, char **argv)
     Model model(layers, NUM_LAYERS, BATCH_SIZE, INPUT_SIZE, OUTPUT_SIZE);
 
     CategoricalCrossentropy loss_obj(1e-7);
+    Accuracy acc_obj;
 
-    for (int bi = 0; bi < num_batches; ++bi) {
-        model.forward(x_batches[bi], y_pred_batches[bi]);
-        float loss = loss_obj.forward(y_batches[bi], y_pred_batches[bi], BATCH_SIZE, OUTPUT_SIZE);
-        std::cout << "Loss for batch " << bi << ": " << loss << std::endl;
+    float loss_batch;
+    for (int epoch = 0; epoch < NUM_EPOCHS; epoch++) {
+        printf("====================Epoch (%d/%d)====================\n", epoch + 1, NUM_EPOCHS);
 
-        model.backward(y_batches[bi], y_pred_batches[bi], &loss_obj);
-        model.update_weights(LEARNING_RATE);
-        break;
-    } 
+        for (int bi = 0; bi < num_batches; ++bi) {
+            model.forward(x_batches[bi], y_pred_batches[bi]);
+            
+            loss_batch = loss_obj.forward(y_batches[bi], y_pred_batches[bi], BATCH_SIZE, OUTPUT_SIZE);
+            loss_obj.update_state(loss_batch);
+            acc_obj.update_state(y_pred_batches[bi], y_batches[bi], BATCH_SIZE, OUTPUT_SIZE);
+
+            model.backward(y_batches[bi], y_pred_batches[bi], &loss_obj);
+            model.update_weights(LEARNING_RATE);
+
+            if (bi % 100 == 0 || bi == num_batches - 1) {
+                printf("Iter (%d/%d): loss - %f, acc - %f\n", 
+                bi, num_batches - 1, 
+                loss_obj.compute_average_loss(), acc_obj.compute());
+            }
+        }
+        loss_obj.reset_state();
+        acc_obj.reset_state();
+    }
 
     // Deallocate
     for (size_t i = 0; i < num_batches; ++i)
