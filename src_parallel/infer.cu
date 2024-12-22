@@ -7,7 +7,7 @@
 #include "layer/dense.hh"
 #include "layer/relu.hh"
 #include "layer/softmax.hh"
-#include "helpers.hh"
+#include "utils/helpers.hh"
 
 const int INPUT_SIZE = 784; // Example: MNIST image input size
 const int OUTPUT_SIZE = 10;
@@ -56,13 +56,23 @@ int main(int argc, char **argv) {
 
     // Define the model layers
     std::mt19937 global_rng(1); // Random number generator
+    unsigned long seed = 1;
+
     Layer *layers[] = {
-        new Dense(BATCH_SIZE, INPUT_SIZE, 128, global_rng),
+        new Dense(BATCH_SIZE, INPUT_SIZE, 128, dim3(256), seed),
         new ReLU(BATCH_SIZE, 128),
-        new Dense(BATCH_SIZE, 128, 128, global_rng),
+        new Dense(BATCH_SIZE, 128, 128, dim3(256), seed),
         new ReLU(BATCH_SIZE, 128),
-        new Dense(BATCH_SIZE, 128, OUTPUT_SIZE, global_rng),
-        new Softmax(BATCH_SIZE, OUTPUT_SIZE)
+        new Dense(BATCH_SIZE, 128, OUTPUT_SIZE, dim3(256), seed),
+        new Softmax(BATCH_SIZE, OUTPUT_SIZE)};
+
+    dim3 blockSizes[] = {
+        dim3(16, 16),
+        dim3(256),
+        dim3(16, 16),
+        dim3(256),
+        dim3(16, 16),
+        dim3(256),
     };
     const int NUM_LAYERS = sizeof(layers) / sizeof(layers[0]);
 
@@ -73,8 +83,22 @@ int main(int argc, char **argv) {
     model.load_weights(checkpoint_path);
 
     // Predict using your model
+
+    float* input_d;
+    float* output_d;
+    CHECK(cudaMalloc(&input_d, INPUT_SIZE * sizeof(float)));
+    CHECK(cudaMalloc(&output_d, OUTPUT_SIZE * sizeof(float)));
+
+    CHECK(cudaMemcpy(input_d, input_image, INPUT_SIZE * sizeof(float), cudaMemcpyHostToDevice));
+
+    model.forward(input_d, output_d, blockSizes);
     float *output = new float[OUTPUT_SIZE];
-    model.forward(input_image, output);
+
+    CHECK(cudaMemcpy(output, output_d, OUTPUT_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
+
+    CHECK(cudaFree(input_d));
+    CHECK(cudaFree(output_d));
+
 
     // Find the class with the highest score
     int predicted_class = std::max_element(output, output + OUTPUT_SIZE) - output;
@@ -86,6 +110,5 @@ int main(int argc, char **argv) {
     // Free memory
     delete[] input_image;
     delete[] output;
-
     return 0;
 }
