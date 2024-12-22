@@ -1,5 +1,30 @@
 #include "dense.hh"
 
+// glorot uniform
+void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
+{
+    // Calculate the Glorot Uniform limit
+    float limit = std::sqrt(6.0f / (rows + cols)); 
+
+    // Create a uniform distribution between -limit and +limit
+    std::uniform_real_distribution<float> dis(-limit, limit);
+
+    // Initialize weights
+    for (int i = 0; i < rows; ++i)
+    {
+        for (int j = 0; j < cols; ++j)
+        {
+            weights[i * cols + j] = dis(gen);
+        }
+    }
+
+    // Initialize biases to 0
+    for (int j = 0; j < cols; ++j)
+    {
+        biases[j] = 0.0f;
+    }
+}
+
 void matmul(const float *A, const float *B, float *C, int M, int K, int N)
 {
     // Matrix multiplication: C[M x N] = A[M x K] * B[K x N]
@@ -27,30 +52,6 @@ void transpose(const float *in, float *out, int M, int N)
     }
 }
 
-// glorot uniform
-void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
-{
-    // Calculate the Glorot Uniform limit
-    float limit = std::sqrt(6.0f / (rows + cols)); 
-
-    // Create a uniform distribution between -limit and +limit
-    std::uniform_real_distribution<float> dis(-limit, limit);
-
-    // Initialize weights
-    for (int i = 0; i < rows; ++i)
-    {
-        for (int j = 0; j < cols; ++j)
-        {
-            weights[i * cols + j] = dis(gen);
-        }
-    }
-
-    // Initialize biases to 0
-    for (int j = 0; j < cols; ++j)
-    {
-        biases[j] = 0.0f;
-    }
-}
 
 Dense::Dense(int batch_size, int input_size, int output_size, std::mt19937 &gen) : Layer(batch_size, input_size, output_size)
 {

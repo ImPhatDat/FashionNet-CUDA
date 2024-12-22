@@ -23,38 +23,46 @@ Model::~Model() {
 }
 
 
-void Model::forward(const float* batch_input, float*& batch_output) {
-    float* tmp_x;
-    float* x = new float[this->batch_size * this->layers[0]->output_size];
-    this->layers[0]->forward(batch_input, x);
+void Model::forward(const float* batch_input, float*& batch_output, dim3 blockSizes[]) {
+    // batch_input is on host
+    float* batch_input_device;
+    CHECK(cudaMalloc(&batch_input_device, sizeof(float) * this->batch_size * this->input_size));
+    CHECK(cudaMemcpy(batch_input_device, batch_input, sizeof(float) * this->batch_size * this->input_size, cudaMemcpyHostToDevice));
+    
+    float* x;
+    CHECK(cudaMalloc(&x, sizeof(float) * this->batch_size *  this->layers[0]->output_size));
+    this->layers[0]->forward(batch_input_device, x, blockSizes[0]);
 
+    float* tmp_x;
     for (int i = 1; i < this->num_layers; i++) {
-        tmp_x = new float[this->batch_size * this->layers[i]->output_size];
-        this->layers[i]->forward(x, tmp_x);
-        delete[] x;
+        CHECK(cudaMalloc(&tmp_x, sizeof(float) * this->batch_size *  this->layers[i]->output_size));
+        this->layers[i]->forward(x, tmp_x, blockSizes[i]);
+        CHECK(cudaFree(x));
         x = tmp_x;
     }
     batch_output = x;
 }
 
-void Model::backward(const uint8_t* y_true, const float* y_pred, Loss* loss) {
-    float* grad_x = new float[this->batch_size * this->num_classes];
-    loss->backward(y_true, y_pred, this->batch_size, this->num_classes, grad_x);
+void Model::backward(const uint8_t* y_true, const float* y_pred, dim3 blockSizes[], Loss* loss, dim3 loss_blockSize) {
+    float* grad_x;
+    CHECK(cudaMalloc(&grad_x, sizeof(float) * this->batch_size * this->num_classes));
+    loss->backward(y_true, y_pred, this->batch_size, this->num_classes, grad_x, loss_blockSize);
 
+    float* grad_tmp;
     for (int i = num_layers - 1; i >= 0; i--) {
-        float* grad_tmp = new float[this->batch_size * this->layers[i]->input_size];
-        this->layers[i]->backward(grad_x, grad_tmp);
+        CHECK(cudaMalloc(&grad_tmp, sizeof(float) * this->batch_size * this->layers[i]->input_size));
+        this->layers[i]->backward(grad_x, grad_tmp, blockSizes[i]);
         
-        delete[] grad_x;
+        CHECK(cudaFree(grad_x));
         grad_x = grad_tmp;
     }
 
-    delete[] grad_x;
+    CHECK(cudaFree(grad_x));
 }
 
-void Model::update_weights(const float learning_rate) {
+void Model::update_weights(const float learning_rate, dim3 blockSizes[]) {
     for (int i = 0; i < this->num_layers; i++) {
-        this->layers[i]->update_weights(learning_rate);
+        this->layers[i]->update_weights(learning_rate, blockSizes[i]);
     }
 }
 
@@ -69,14 +77,14 @@ void Model::save_weights(std::string path) {
     file.write(reinterpret_cast<const char*>(&this->num_layers), sizeof(this->num_layers));
 
     for (int l = 0; l < this->num_layers; l++) {
-        float* weights = this->layers[l]->get_weights();
-        float* biases = this->layers[l]->get_biases();
         int input_size = this->layers[l]->input_size;
         int output_size = this->layers[l]->output_size;
-
         // Save the dimensions of the weight matrix
         file.write(reinterpret_cast<const char*>(&input_size), sizeof(input_size));
         file.write(reinterpret_cast<const char*>(&output_size), sizeof(output_size));
+
+        float* weights = this->layers[l]->get_weights();
+        float* biases = this->layers[l]->get_biases();
 
         // Indicate if weights are present
         bool has_weights = weights != nullptr;
@@ -91,6 +99,9 @@ void Model::save_weights(std::string path) {
         if (has_biases) {
             file.write(reinterpret_cast<const char*>(biases), output_size * sizeof(float));
         }
+
+        delete[] weights;
+        delete[] biases;
     }
 
     file.close();
