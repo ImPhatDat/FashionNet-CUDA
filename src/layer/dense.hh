@@ -30,7 +30,7 @@ private:
     float *grad_biases = nullptr;
 
 public:
-    Dense(int batch_size, int input_size, int output_size, std::mt19937 &gen);
+    Dense(int batch_size, int input_size, int output_size, bool init, std::mt19937 &gen);
     ~Dense();
 
     float *get_weights() const override { return weights; }

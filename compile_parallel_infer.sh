@@ -3,4 +3,4 @@ nvcc src_parallel/infer.cu src_parallel/utils/fashion_mnist.cu \
     src_parallel/loss/loss.cu src_parallel/loss/categorical_crossentropy.cu \
     src_parallel/Model/Model.cu \
     src_parallel/metrics/accuracy.cu \
-    -o a_parallel.out
+    -o infer_parallel.out

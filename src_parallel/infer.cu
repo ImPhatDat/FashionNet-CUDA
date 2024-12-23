@@ -59,11 +59,11 @@ int main(int argc, char **argv) {
     unsigned long seed = 1;
 
     Layer *layers[] = {
-        new Dense(BATCH_SIZE, INPUT_SIZE, 128, dim3(256), seed),
+        new Dense(BATCH_SIZE, INPUT_SIZE, 128, dim3(256), false, seed),
         new ReLU(BATCH_SIZE, 128),
-        new Dense(BATCH_SIZE, 128, 128, dim3(256), seed),
+        new Dense(BATCH_SIZE, 128, 128, dim3(256), false, seed),
         new ReLU(BATCH_SIZE, 128),
-        new Dense(BATCH_SIZE, 128, OUTPUT_SIZE, dim3(256), seed),
+        new Dense(BATCH_SIZE, 128, OUTPUT_SIZE, dim3(256), false, seed),
         new Softmax(BATCH_SIZE, OUTPUT_SIZE)};
 
     dim3 blockSizes[] = {

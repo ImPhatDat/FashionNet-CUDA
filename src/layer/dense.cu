@@ -53,7 +53,7 @@ void transpose(const float *in, float *out, int M, int N)
 }
 
 
-Dense::Dense(int batch_size, int input_size, int output_size, std::mt19937 &gen) : Layer(batch_size, input_size, output_size)
+Dense::Dense(int batch_size, int input_size, int output_size, bool init, std::mt19937 &gen) : Layer(batch_size, input_size, output_size)
 {
     this->name = "dense";
     // Allocate and initialize weights and biases
@@ -63,7 +63,8 @@ Dense::Dense(int batch_size, int input_size, int output_size, std::mt19937 &gen)
     grad_weights = new float[input_size * output_size];
     grad_biases = new float[output_size];
 
-    initialize_dense(weights, biases, input_size, output_size, gen); // Initialize weights
+    if (init)
+        initialize_dense(weights, biases, input_size, output_size, gen); // Initialize weights
 }
 
 Dense::~Dense()

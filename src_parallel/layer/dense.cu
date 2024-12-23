@@ -81,7 +81,7 @@ void transpose(const float *in, float *out, int M, int N, dim3 blockSize)
 }
 
 
-Dense::Dense(int batch_size, int input_size, int output_size, dim3 blockSize, unsigned long seed) : Layer(batch_size, input_size, output_size)
+Dense::Dense(int batch_size, int input_size, int output_size, dim3 blockSize, bool init, unsigned long seed) : Layer(batch_size, input_size, output_size)
 {
     this->name = "dense";
     // Allocate and initialize weights and biases
@@ -91,7 +91,8 @@ Dense::Dense(int batch_size, int input_size, int output_size, dim3 blockSize, un
     CHECK(cudaMalloc(&grad_weights, sizeof(float) * input_size * output_size));
     CHECK(cudaMalloc(&grad_biases, sizeof(float) * output_size));
 
-    initialize_dense(weights, biases, input_size, output_size, blockSize, seed); // Initialize weights
+    if (init)
+        initialize_dense(weights, biases, input_size, output_size, blockSize, seed); // Initialize weights
 }
 
 Dense::~Dense()

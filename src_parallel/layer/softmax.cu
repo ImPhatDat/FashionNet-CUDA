@@ -15,8 +15,8 @@ __global__ void softmax_forward_kernel(const float *input, float *output, int ba
     if (b >= batch_size || c >= input_size) return;
 
     // Compute max for numerical stability
-    float max_val = -FLT_MAX;
-    for (int i = 0; i < input_size; ++i) {
+    float max_val = input[b * input_size + 0];
+    for (int i = 1; i < input_size; ++i) {
         max_val = fmaxf(max_val, input[b * input_size + i]);
     }
 

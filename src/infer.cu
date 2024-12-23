@@ -7,11 +7,16 @@
 #include "layer/dense.hh"
 #include "layer/relu.hh"
 #include "layer/softmax.hh"
-#include "helpers.hh"
+#include "utils/helpers.hh"
 
 const int INPUT_SIZE = 784; // Example: MNIST image input size
 const int OUTPUT_SIZE = 10;
 const int BATCH_SIZE = 1; // Single image for inference
+
+
+// Define the model layers
+std::mt19937 global_rng(1); // Random number generator
+unsigned long seed = 1;
 
 int main(int argc, char **argv) {
     std::string checkpoint_path = "";
@@ -54,16 +59,15 @@ int main(int argc, char **argv) {
         input_image[i] = img[i] / 255.0f;
     }
 
-    // Define the model layers
-    std::mt19937 global_rng(1); // Random number generator
+
     Layer *layers[] = {
-        new Dense(BATCH_SIZE, INPUT_SIZE, 128, global_rng),
+        new Dense(BATCH_SIZE, INPUT_SIZE, 128, false, global_rng),
         new ReLU(BATCH_SIZE, 128),
-        new Dense(BATCH_SIZE, 128, 128, global_rng),
+        new Dense(BATCH_SIZE, 128, 128, false, global_rng),
         new ReLU(BATCH_SIZE, 128),
-        new Dense(BATCH_SIZE, 128, OUTPUT_SIZE, global_rng),
-        new Softmax(BATCH_SIZE, OUTPUT_SIZE)
-    };
+        new Dense(BATCH_SIZE, 128, OUTPUT_SIZE, false, global_rng),
+        new Softmax(BATCH_SIZE, OUTPUT_SIZE)};
+
     const int NUM_LAYERS = sizeof(layers) / sizeof(layers[0]);
 
     // Create the model
@@ -72,7 +76,6 @@ int main(int argc, char **argv) {
     // Load the model weights
     model.load_weights(checkpoint_path);
 
-    // Predict using your model
     float *output = new float[OUTPUT_SIZE];
     model.forward(input_image, output);
 
@@ -86,6 +89,5 @@ int main(int argc, char **argv) {
     // Free memory
     delete[] input_image;
     delete[] output;
-
     return 0;
 }

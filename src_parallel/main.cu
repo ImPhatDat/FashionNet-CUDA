@@ -169,11 +169,11 @@ int main(int argc, char **argv)
     test_set.prepareBatchesWithLabels(batch_size, INPUT_SIZE, test_x_batches, test_y_batches);
 
     Layer *layers[] = {
-        new Dense(batch_size, INPUT_SIZE, 128, dim3(256), seed),
+        new Dense(batch_size, INPUT_SIZE, 128, dim3(256), true, seed),
         new ReLU(batch_size, 128),
-        new Dense(batch_size, 128, 128, dim3(256), seed),
+        new Dense(batch_size, 128, 128, dim3(256), true, seed),
         new ReLU(batch_size, 128),
-        new Dense(batch_size, 128, OUTPUT_SIZE, dim3(256), seed),
+        new Dense(batch_size, 128, OUTPUT_SIZE, dim3(256), true, seed),
         new Softmax(batch_size, OUTPUT_SIZE)};
 
     dim3 blockSizes[] = {
