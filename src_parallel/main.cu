@@ -225,6 +225,8 @@ int main(int argc, char **argv)
     //tmp malloc
     uint8_t * d_y_true;
     CHECK(cudaMalloc(&d_y_true, sizeof(uint8_t) * batch_size));
+    float * d_x;
+    CHECK(cudaMalloc(&d_x, sizeof(float) * batch_size * INPUT_SIZE));
     float * d_y_pred;
     CHECK(cudaMalloc(&d_y_pred, sizeof(float) * batch_size * OUTPUT_SIZE));
     float* h_y_pred = new float[batch_size * OUTPUT_SIZE];
@@ -242,7 +244,8 @@ int main(int argc, char **argv)
         acc_obj.reset_state();
         for (int bi = 0; bi < num_batches; ++bi)
         {
-            model.forward(x_batches[bi], d_y_pred, blockSizes);
+            CHECK(cudaMemcpy(d_x, x_batches[bi], sizeof(float) * batch_size * INPUT_SIZE, cudaMemcpyHostToDevice));
+            model.forward(d_x, d_y_pred, blockSizes);
             CHECK(cudaMemcpy(d_y_true, y_batches[bi], sizeof(uint8_t) * batch_size, cudaMemcpyHostToDevice));
             
             loss_batch = loss_obj.forward(d_y_true, d_y_pred, batch_size, OUTPUT_SIZE, loss_blockSize);
@@ -267,7 +270,8 @@ int main(int argc, char **argv)
 
         for (int bi = 0; bi < test_num_batches; ++bi)
         {
-            model.forward(test_x_batches[bi], d_y_pred, blockSizes);
+            CHECK(cudaMemcpy(d_x, test_x_batches[bi], sizeof(float) * batch_size * INPUT_SIZE, cudaMemcpyHostToDevice));
+            model.forward(d_x, d_y_pred, blockSizes);
 
             CHECK(cudaMemcpy(d_y_true, test_y_batches[bi], sizeof(uint8_t) * batch_size, cudaMemcpyHostToDevice));
             loss_batch = loss_obj.forward(d_y_true, d_y_pred, batch_size, OUTPUT_SIZE, loss_blockSize);
@@ -321,6 +325,7 @@ int main(int argc, char **argv)
     // delete[] tmp_batch;
 
     // Deallocate
+    CHECK(cudaFree(d_x));
     CHECK(cudaFree(d_y_true));
     CHECK(cudaFree(d_y_pred));
     delete[] h_y_pred;
