@@ -1,30 +1,76 @@
 #include "../../../src_parallel/layer/dense.hh"
 
 //optimize here
-__global__ void matmul_kernel(const float *A, const float *B, float *C, int M, int K, int N) {
-    // Compute row and column index
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
+#define BLOCK_SIZE 16
+#define TILE_K 8
+#define REG_TILE_X 4
+#define REG_TILE_Y 4
 
-    // Ensure valid thread indices
-    if (row < M && col < N) {
-        float sum = 0.0f;
+__global__ void matmul_kernel(const float* A, const float* B, float* C, 
+                                      int M, int N, int K) {
+    const int tid = threadIdx.y * blockDim.x + threadIdx.x;
+    const int row = blockIdx.y * (BLOCK_SIZE/REG_TILE_Y) + threadIdx.y;
+    const int col = blockIdx.x * (BLOCK_SIZE/REG_TILE_X) + threadIdx.x;
 
-        // Perform dot product for the row of A and column of B
-        for (int k = 0; k < K; ++k) {
-            sum += A[row * K + k] * B[k * N + col];
+    // Register tiles for accumulation
+    float accum[REG_TILE_Y][REG_TILE_X] = {0.0f};
+    
+    for (int tk = 0; tk < K; tk += TILE_K) {
+        // Load A and B tiles into registers
+        float a_reg[REG_TILE_Y][TILE_K];
+        float b_reg[TILE_K][REG_TILE_X];
+
+        #pragma unroll
+        for (int i = 0; i < REG_TILE_Y; i++) {
+            #pragma unroll
+            for (int k = 0; k < TILE_K; k++) {
+                if (row + i < M && tk + k < K) {
+                    a_reg[i][k] = A[(row + i) * K + (tk + k)];
+                }
+            }
         }
 
-        // Write result to C
-        C[row * N + col] = sum;
+        #pragma unroll
+        for (int k = 0; k < TILE_K; k++) {
+            #pragma unroll
+            for (int j = 0; j < REG_TILE_X; j++) {
+                if (tk + k < K && col + j < N) {
+                    b_reg[k][j] = B[(tk + k) * N + (col + j)];
+                }
+            }
+        }
+
+        // Compute outer product
+        #pragma unroll
+        for (int k = 0; k < TILE_K; k++) {
+            #pragma unroll
+            for (int i = 0; i < REG_TILE_Y; i++) {
+                #pragma unroll
+                for (int j = 0; j < REG_TILE_X; j++) {
+                    accum[i][j] += a_reg[i][k] * b_reg[k][j];
+                }
+            }
+        }
+    }
+
+    // Store results
+    #pragma unroll
+    for (int i = 0; i < REG_TILE_Y; i++) {
+        #pragma unroll
+        for (int j = 0; j < REG_TILE_X; j++) {
+            if (row + i < M && col + j < N) {
+                C[(row + i) * N + (col + j)] = accum[i][j];
+            }
+        }
     }
 }
 
 void matmul(const float *A, const float *B, float *C, int M, int K, int N, dim3 blockSize) {
+    dim3 blockSize2(BLOCK_SIZE/REG_TILE_X, BLOCK_SIZE/REG_TILE_Y);
     // Calculate grid size
     dim3 gridSize((N + blockSize.x - 1) / blockSize.x, (M + blockSize.y - 1) / blockSize.y);
     // Launch kernel
-    matmul_kernel<<<gridSize, blockSize>>>(A, B, C, M, K, N);
+    matmul_kernel<<<gridSize, blockSize2>>>(A, B, C, M, K, N);
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
 }
