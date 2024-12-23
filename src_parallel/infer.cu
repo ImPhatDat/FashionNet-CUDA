@@ -16,11 +16,13 @@ const int BATCH_SIZE = 1; // Single image for inference
 int main(int argc, char **argv) {
     std::string checkpoint_path = "";
     std::string img_path = "";
-
+    int blockSize1d = 256;
+    int blockSize2d_x = 32;
+    int blockSize2d_y = 32;
     int opt;
 
     // Parsing command-line arguments
-    while ((opt = getopt(argc, argv, "p:i:")) != -1)
+    while ((opt = getopt(argc, argv, "p:i:k:x:y:")) != -1)
     {
         switch (opt)
         {
@@ -30,11 +32,27 @@ int main(int argc, char **argv) {
         case 'i':
             img_path = optarg; // Store the checkpoint path
             break;
+        case 'k':
+            blockSize1d = atoi(optarg); // Convert argument to integer
+            break;
+        case 'x':
+            blockSize2d_x = atoi(optarg); // Convert argument to integer
+            break;
+        case 'y':
+            blockSize2d_y = atoi(optarg); // Convert argument to integer
+            break;
         default:
-            fprintf(stderr, "Usage: %s [-p checkpoint_path] [-i image_path]\n", argv[0]);
+            fprintf(stderr, "Usage: %s [-p checkpoint_path] [-i image_path] [-k blockSize1d] [-x blockSize2d_x] [-y blockSize2d_y]\n", argv[0]);
             exit(EXIT_FAILURE);
         }
     }
+
+    std::cout << "\nConfigurations:" << std::endl;
+    std::cout << "\tCheckpoint: " << checkpoint_path << std::endl;
+    std::cout << "\tImage: " << img_path << std::endl;
+    std::cout << "\tBlockSize 1D: " << blockSize1d << std::endl;
+    std::cout << "\tBlockSize 2D_x: " << blockSize2d_x << std::endl;
+    std::cout << "\tBlockSize 2D_y: " << blockSize2d_y << std::endl;
 
     // Load a random PNG file
     std::ifstream file(img_path, std::ios::binary);
@@ -59,20 +77,20 @@ int main(int argc, char **argv) {
     unsigned long seed = 1;
 
     Layer *layers[] = {
-        new Dense(BATCH_SIZE, INPUT_SIZE, 128, dim3(256), false, seed),
+        new Dense(BATCH_SIZE, INPUT_SIZE, 128, dim3(blockSize1d), false, seed),
         new ReLU(BATCH_SIZE, 128),
-        new Dense(BATCH_SIZE, 128, 128, dim3(256), false, seed),
+        new Dense(BATCH_SIZE, 128, 128, dim3(blockSize1d), false, seed),
         new ReLU(BATCH_SIZE, 128),
-        new Dense(BATCH_SIZE, 128, OUTPUT_SIZE, dim3(256), false, seed),
+        new Dense(BATCH_SIZE, 128, OUTPUT_SIZE, dim3(blockSize1d), false, seed),
         new Softmax(BATCH_SIZE, OUTPUT_SIZE)};
 
     dim3 blockSizes[] = {
-        dim3(16, 16),
-        dim3(256),
-        dim3(16, 16),
-        dim3(256),
-        dim3(16, 16),
-        dim3(256),
+        dim3(blockSize2d_x, blockSize2d_y),
+        dim3(blockSize1d),
+        dim3(blockSize2d_x, blockSize2d_y),
+        dim3(blockSize1d),
+        dim3(blockSize2d_x, blockSize2d_y),
+        dim3(blockSize1d),
     };
     const int NUM_LAYERS = sizeof(layers) / sizeof(layers[0]);
 

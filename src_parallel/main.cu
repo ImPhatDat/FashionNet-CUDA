@@ -91,10 +91,6 @@ struct HostTimer
     }
 };
 
-const std::string train_imageFilePath = "data/fashion-mnist/train-images-idx3-ubyte";
-const std::string train_labelFilePath = "data/fashion-mnist/train-labels-idx1-ubyte";
-const std::string test_imageFilePath = "data/fashion-mnist/t10k-images-idx3-ubyte";
-const std::string test_labelFilePath = "data/fashion-mnist/t10k-labels-idx1-ubyte";
 
 unsigned long seed = 1;
 std::mt19937 global_rng(1); // Random number generator
@@ -105,21 +101,27 @@ const int OUTPUT_SIZE = 10;
 
 int main(int argc, char **argv)
 {
+    printDeviceInfo();
+    std::string dataset_path = "";
     int num_epoch = 10;
     int batch_size = 64; // Default value
     float learning_rate = 0.001;
     std::string checkpoint_path = "";
 
     int blockSize1d = 256;
-    int blockSize2d = 32;
+    int blockSize2d_x = 32;
+    int blockSize2d_y = 32;
 
     int opt;
-
+    
     // Parsing command-line arguments
-    while ((opt = getopt(argc, argv, "e:b:l:p:b1:b2:")) != -1)
+    while ((opt = getopt(argc, argv, "d:e:b:l:p:k:x:y:")) != -1)
     {
         switch (opt)
         {
+        case 'd':
+            dataset_path = optarg; // Convert argument to integer
+            break;
         case 'e':
             num_epoch = atoi(optarg); // Convert argument to integer
             break;
@@ -127,23 +129,41 @@ int main(int argc, char **argv)
             batch_size = atoi(optarg); // Convert argument to integer
             break;
         case 'l':
-            learning_rate = atof(optarg); // Convert argument to integer
+            learning_rate = atof(optarg); // Convert argument to float
             break;
         case 'p':
             checkpoint_path = optarg; // Store the checkpoint path
             break;
-        case 'b1':
+        case 'k':
             blockSize1d = atoi(optarg); // Convert argument to integer
             break;
-        case 'b2':
-            blockSize2d = atoi(optarg); // Convert argument to integer
+        case 'x':
+            blockSize2d_x = atoi(optarg); // Convert argument to integer
+            break;
+        case 'y':
+            blockSize2d_y = atoi(optarg); // Convert argument to integer
             break;
         default:
-            fprintf(stderr, "Usage: %s [-e num_epoch] [-b batchsize] [-l learning_rate] [-p checkpoint_path] [-b1 blockSize1d] [-b2 blockSize2d]\n", argv[0]);
+            fprintf(stderr, "Usage: %s [-d dataset_path] [-e num_epoch] [-b batchsize] [-l learning_rate] [-p checkpoint_path] [-k blockSize1d] [-x blockSize2d_x] [-y blockSize2d_y]\n", argv[0]);
             exit(EXIT_FAILURE);
         }
     }
-    printDeviceInfo();
+
+    std::cout << "\nConfigurations:" << std::endl;
+    std::cout << "\tDataset path: " << dataset_path << std::endl;
+    std::cout << "\tNum epoch: " << num_epoch << std::endl;
+    std::cout << "\tBatch size: " << batch_size << std::endl;
+    std::cout << "\tLearning rate: " << learning_rate << std::endl;
+    std::cout << "\tCheckpoint: " << checkpoint_path << std::endl;
+    std::cout << "\tBlockSize 1D: " << blockSize1d << std::endl;
+    std::cout << "\tBlockSize 2D_x: " << blockSize2d_x << std::endl;
+    std::cout << "\tBlockSize 2D_y: " << blockSize2d_y << std::endl;
+
+
+    const std::string train_imageFilePath = dataset_path + "train-images-idx3-ubyte";
+    const std::string train_labelFilePath = dataset_path + "train-labels-idx1-ubyte";
+    const std::string test_imageFilePath = dataset_path + "t10k-images-idx3-ubyte";
+    const std::string test_labelFilePath = dataset_path + "t10k-labels-idx1-ubyte";
 
     // Load dataset
     FashionMnist train_set;
@@ -187,11 +207,11 @@ int main(int argc, char **argv)
         new Softmax(batch_size, OUTPUT_SIZE)};
 
     dim3 blockSizes[] = {
-        dim3(blockSize2d, blockSize2d),
+        dim3(blockSize2d_x, blockSize2d_y),
         dim3(blockSize1d),
-        dim3(blockSize2d, blockSize2d),
+        dim3(blockSize2d_x, blockSize2d_y),
         dim3(blockSize1d),
-        dim3(blockSize2d, blockSize2d),
+        dim3(blockSize2d_x, blockSize2d_y),
         dim3(blockSize1d),
     };
 
@@ -203,12 +223,6 @@ int main(int argc, char **argv)
     CategoricalCrossentropy loss_obj(1e-7);
     Accuracy acc_obj;
     float loss_batch;
-
-    std::cout << "\nConfigurations:" << std::endl;
-    std::cout << "\tNum epoch: " << num_epoch << std::endl;
-    std::cout << "\tBatch size: " << batch_size << std::endl;
-    std::cout << "\tLearning rate: " << learning_rate << std::endl;
-    std::cout << "\tCheckpoint: " << checkpoint_path << std::endl;
 
     HostTimer epoch_timer;
     HostTimer total_timer;
