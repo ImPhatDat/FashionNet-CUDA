@@ -13,37 +13,54 @@ __global__ void transpose_kernel(const float *in, float *out, int M, int N)
     }
 }
 
-#define TILE_WIDTH 32
-__global__ void transpose_kernel_version1(const float *in, float *out, int M, int N)
-{
-    __shared__ float s_blkData[TILE_WIDTH][TILE_WIDTH + 1];
-    // Each block load data efficiently from GMEM to SMEM
-    int iR = blockIdx.y * blockDim.y + threadIdx.x;
-    int iC = blockIdx.x * blockDim.x + threadIdx.y;
-    s_blkData[threadIdx.y][threadIdx.x] = in[iR * N + iC];
+#define TILE_DIM 32
+#define BLOCK_DIM 32
+__global__ void transpose_kernel_version1(const float* input, float* output, 
+                                     const int rows, const int cols, int block_dim) {
+    __shared__ float tile[TILE_DIM][TILE_DIM + 1];  // +1 prevents bank conflicts
+    
+    // Calculate global indices
+    const int global_row = blockIdx.y * TILE_DIM + threadIdx.y;
+    const int global_col = blockIdx.x * TILE_DIM + threadIdx.x;
+    
+    // Calculate local indices within the tile
+    const int local_row = threadIdx.y;
+    const int local_col = threadIdx.x;
+    
+    // Load phase - each thread loads one element into shared memory if within bounds
+    for (int i = 0; i < TILE_DIM && global_row + i < rows && global_col < cols; i += block_dim) {
+        tile[local_row + i][local_col] = input[(global_row + i) * cols + global_col];
+    }
+    
     __syncthreads();
-    // Each block write data efficiently from SMEM to GMEM
-    int oR = blockIdx.x * blockDim.x + threadIdx.x;
-    int oC = blockIdx.y * blockDim.y + threadIdx.y;
-    out[oR * M + oC] = s_blkData[threadIdx.x][threadIdx.y];
+    
+    // Calculate transposed global positions
+    const int new_row = blockIdx.x * TILE_DIM + threadIdx.y;
+    const int new_col = blockIdx.y * TILE_DIM + threadIdx.x;
+    
+    // Store phase - write data from shared memory to global memory
+    for (int i = 0; i < TILE_DIM && new_row + i < cols && new_col < rows; i += block_dim) {
+        output[(new_row + i) * rows + new_col] = tile[threadIdx.x][threadIdx.y + i];
+    }
 }
-
-void transpose(const float *in, float *out, int M, int N, dim3 blockSize)
+void transpose(const float *in, float *out, int M, int N) //, dim3 blockSize) use fixed blockSize
 {
-    dim3 gridSize((N + blockSize.x - 1) / blockSize.x, (
-        M + blockSize.y - 1) / blockSize.y); // Grid size calculation
+    dim3 blockSize(BLOCK_DIM, BLOCK_DIM);
+    dim3 gridSize((N + BLOCK_DIM - 1) / BLOCK_DIM, (M + BLOCK_DIM - 1) / BLOCK_DIM); // Grid size calculation
     // Launch the kernel
-    transpose_kernel_version1<<<gridSize, blockSize>>>(in, out, M, N);
+    transpose_kernel_version1<<<gridSize, blockSize>>>(in, out, M, N, BLOCK_DIM);
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
 }
 // ends here
 
-__global__ void initialize_weights_kernel(float *weights, int rows, int cols, float limit, unsigned long seed) {
+__global__ void initialize_weights_kernel(float *weights, int rows, int cols, float limit, unsigned long seed)
+{
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int total = rows * cols;
 
-    if (idx >= total) return;
+    if (idx >= total)
+        return;
     curandState state;
     curand_init(seed, idx, 0, &state);
 
@@ -52,7 +69,8 @@ __global__ void initialize_weights_kernel(float *weights, int rows, int cols, fl
 }
 
 // Glorot Uniform initialization
-void initialize_dense(float *d_weights, float *d_biases, int rows, int cols, dim3 blockSize, unsigned long seed) {
+void initialize_dense(float *d_weights, float *d_biases, int rows, int cols, dim3 blockSize, unsigned long seed)
+{
     // Glorot Uniform limit
     float limit = std::sqrt(6.0f / (rows + cols));
 
@@ -66,19 +84,20 @@ void initialize_dense(float *d_weights, float *d_biases, int rows, int cols, dim
     CHECK(cudaMemset(d_biases, 0, cols * sizeof(float)));
 }
 
-
-
-__global__ void matmul_kernel(const float *A, const float *B, float *C, int M, int K, int N) {
+__global__ void matmul_kernel(const float *A, const float *B, float *C, int M, int K, int N)
+{
     // Compute row and column index
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Ensure valid thread indices
-    if (row < M && col < N) {
+    if (row < M && col < N)
+    {
         float sum = 0.0f;
 
         // Perform dot product for the row of A and column of B
-        for (int k = 0; k < K; ++k) {
+        for (int k = 0; k < K; ++k)
+        {
             sum += A[row * K + k] * B[k * N + col];
         }
 
@@ -87,7 +106,8 @@ __global__ void matmul_kernel(const float *A, const float *B, float *C, int M, i
     }
 }
 
-void matmul(const float *A, const float *B, float *C, int M, int K, int N, dim3 blockSize) {
+void matmul(const float *A, const float *B, float *C, int M, int K, int N, dim3 blockSize)
+{
     // Calculate grid size
     dim3 gridSize((N + blockSize.x - 1) / blockSize.x, (M + blockSize.y - 1) / blockSize.y);
     // Launch kernel
@@ -142,16 +162,17 @@ void Dense::forward(const float *input, float *output, dim3 blockSize)
     add_bias_kernel<<<gridSize, blockSize>>>(output, biases, batch_size, output_size);
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
-    
 }
 
-
-__global__ void grad_biases_kernel(const float *output_d, float *grad_biases, int batch_size, int output_size) {
+__global__ void grad_biases_kernel(const float *output_d, float *grad_biases, int batch_size, int output_size)
+{
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (col < output_size) {
+    if (col < output_size)
+    {
         float sum = 0.0f;
-        for (int row = 0; row < batch_size; ++row) {
+        for (int row = 0; row < batch_size; ++row)
+        {
             sum += output_d[row * output_size + col];
         }
         grad_biases[col] = sum;
@@ -165,19 +186,19 @@ void Dense::backward(const float *output_d, float *input_d, dim3 blockSize)
     CHECK(cudaMemset(grad_weights, 0, sizeof(float) * input_size * output_size));
     CHECK(cudaMemset(grad_biases, 0, sizeof(float) * output_size));
 
-    float* input_T;
+    float *input_T;
     CHECK(cudaMalloc(&input_T, sizeof(float) * this->batch_size * this->input_size));
     // pre-transpose for backprop
-    transpose(this->input, input_T, this->batch_size, this->input_size, blockSize);
+    transpose(this->input, input_T, this->batch_size, this->input_size);
     // Compute grad_weights: input^T * output_d
     matmul(input_T, output_d, grad_weights, input_size, batch_size, output_size, blockSize);
     CHECK(cudaFree(input_T));
-    
+
     // Compute grad_biases: sum over batch_size
     float *d_output_d_sum;
     CHECK(cudaMalloc(&d_output_d_sum, sizeof(float) * output_size));
     CHECK(cudaMemset(d_output_d_sum, 0, sizeof(float) * output_size));
-    
+
     dim3 gridSize((output_size + blockSize.x - 1) / blockSize.x);
     grad_biases_kernel<<<gridSize, blockSize>>>(output_d, grad_biases, batch_size, output_size);
     CHECK(cudaGetLastError());
@@ -186,19 +207,22 @@ void Dense::backward(const float *output_d, float *input_d, dim3 blockSize)
     // Compute input_d: output_d * weights^T
     float *d_weights_transpose;
     CHECK(cudaMalloc(&d_weights_transpose, sizeof(float) * this->input_size * this->output_size));
-    transpose(this->weights, d_weights_transpose, this->input_size, this->output_size, blockSize);
+    transpose(this->weights, d_weights_transpose, this->input_size, this->output_size);
     matmul(output_d, d_weights_transpose, input_d, batch_size, output_size, input_size, blockSize);
     CHECK(cudaFree(d_weights_transpose));
 }
 
-__global__ void update_with_gradient(float *weights, const float *grad_weights, float learning_rate, int size) {
+__global__ void update_with_gradient(float *weights, const float *grad_weights, float learning_rate, int size)
+{
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < size) {
+    if (idx < size)
+    {
         weights[idx] -= learning_rate * grad_weights[idx];
     }
 }
 
-void Dense::update_weights(float learning_rate, dim3 blockSize) {
+void Dense::update_weights(float learning_rate, dim3 blockSize)
+{
     int total_weights = input_size * output_size;
     dim3 gridSizeWeights((total_weights + blockSize.x - 1) / blockSize.x);
     update_with_gradient<<<gridSizeWeights, blockSize>>>(weights, grad_weights, learning_rate, total_weights);
@@ -212,23 +236,28 @@ void Dense::update_weights(float learning_rate, dim3 blockSize) {
     CHECK(cudaDeviceSynchronize());
 }
 
-void Dense::load_weights(const float* weights, const float* biases) {
-    if (weights != nullptr && biases != nullptr) {
+void Dense::load_weights(const float *weights, const float *biases)
+{
+    if (weights != nullptr && biases != nullptr)
+    {
         CHECK(cudaMemcpy(this->weights, weights, sizeof(float) * this->input_size * this->output_size, cudaMemcpyHostToDevice));
         CHECK(cudaMemcpy(this->biases, biases, sizeof(float) * this->output_size, cudaMemcpyHostToDevice));
     }
-    else {
+    else
+    {
         std::cerr << "Can't load weights with nullptr" << std::endl;
     }
 }
 
-float* Dense::get_weights() const {
-    float* h_weights = new float[this->input_size * this->output_size];
+float *Dense::get_weights() const
+{
+    float *h_weights = new float[this->input_size * this->output_size];
     CHECK(cudaMemcpy(h_weights, this->weights, sizeof(float) * this->input_size * this->output_size, cudaMemcpyDeviceToHost));
     return h_weights;
 }
-float* Dense::get_biases() const {
-    float* h_biases = new float[this->output_size];
+float *Dense::get_biases() const
+{
+    float *h_biases = new float[this->output_size];
     CHECK(cudaMemcpy(h_biases, this->biases, sizeof(float) * this->output_size, cudaMemcpyDeviceToHost));
     return h_biases;
 }

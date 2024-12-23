@@ -58,7 +58,7 @@ void Model::backward(const uint8_t* y_true, const float* y_pred, dim3 blockSizes
 
 void Model::update_weights(const float learning_rate, dim3 blockSizes[]) {
     for (int i = 0; i < this->num_layers; i++) {
-        this->layers[i]->update_weights(learning_rate, blockSizes[i]);
+        this->layers[i]->update_weights(learning_rate, dim3(256));
     }
 }
 
