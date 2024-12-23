@@ -1,128 +1,104 @@
 #include "../src_parallel/layer/softmax.hh"
 
-Softmax::Softmax(int batch_size, int input_size)
-    : Layer(batch_size, input_size, input_size)
-{
+Softmax::Softmax(int batch_size, int input_size) 
+    : Layer(batch_size, input_size, input_size) {
     this->name = "softmax";
 }
 
-// Optimized kernel for forward pass using shared memory
-__global__ void softmax_forward_kernel(const float *input, float *output, int batch_size, int input_size) {
-    extern __shared__ float shared_mem[];
-    float *max_vals = shared_mem;
-    float *sum_exp = &shared_mem[blockDim.x];
+__global__ void softmax_forward_kernel(const float* input, float* output, int batch_size, int input_size) {
+    extern __shared__ float shared_data[];
+    float* max_shared = shared_data;
+    float* sum_shared = &shared_data[blockDim.x];
     
     int tid = threadIdx.x;
     int bid = blockIdx.x;
     
-    // Each block handles one batch
     if (bid >= batch_size) return;
     
-    // Initialize max value for this thread
+    // Find max value
     float local_max = -INFINITY;
-    
-    // Each thread finds its local max across strided elements
     for (int i = tid; i < input_size; i += blockDim.x) {
         local_max = fmaxf(local_max, input[bid * input_size + i]);
     }
-    
-    // Reduce to find max value for the batch
-    max_vals[tid] = local_max;
+    max_shared[tid] = local_max;
     __syncthreads();
     
+    // Parallel reduction for max
     for (int stride = blockDim.x/2; stride > 0; stride >>= 1) {
         if (tid < stride) {
-            max_vals[tid] = fmaxf(max_vals[tid], max_vals[tid + stride]);
+            max_shared[tid] = fmaxf(max_shared[tid], max_shared[tid + stride]);
         }
         __syncthreads();
     }
+    float max_val = max_shared[0];
     
-    float batch_max = max_vals[0];
-    
-    // Compute local sum of exponentials
+    // Compute exponentials and sum
     float local_sum = 0.0f;
     for (int i = tid; i < input_size; i += blockDim.x) {
-        float exp_val = expf(input[bid * input_size + i] - batch_max);
+        float exp_val = expf(input[bid * input_size + i] - max_val);
         output[bid * input_size + i] = exp_val;
         local_sum += exp_val;
     }
-    
-    // Reduce to find total sum
-    sum_exp[tid] = local_sum;
+    sum_shared[tid] = local_sum;
     __syncthreads();
     
+    // Parallel reduction for sum
     for (int stride = blockDim.x/2; stride > 0; stride >>= 1) {
         if (tid < stride) {
-            sum_exp[tid] += sum_exp[tid + stride];
+            sum_shared[tid] += sum_shared[tid + stride];
         }
         __syncthreads();
     }
     
-    float batch_sum = sum_exp[0];
-    
-    // Normalize with the batch sum
+    // Normalize
     for (int i = tid; i < input_size; i += blockDim.x) {
-        output[bid * input_size + i] /= batch_sum;
+        output[bid * input_size + i] /= sum_shared[0];
     }
 }
 
-// Optimized kernel for backward pass using shared memory
-__global__ void softmax_backward_kernel(const float *output, const float *output_d, float *input_d, 
+__global__ void softmax_backward_kernel(const float* output, const float* output_d, float* input_d, 
                                       int batch_size, int input_size) {
-    extern __shared__ float shared_mem[];
-    float *shared_output = shared_mem;
-    float *shared_grad = &shared_mem[input_size];
+    extern __shared__ float shared_data[];
+    float* shared_out = shared_data;
+    float* shared_grad = &shared_data[input_size];
     
     int tid = threadIdx.x;
     int bid = blockIdx.x;
     
     if (bid >= batch_size) return;
     
-    // Load output and output_d into shared memory
+    // Load to shared memory
     for (int i = tid; i < input_size; i += blockDim.x) {
-        shared_output[i] = output[bid * input_size + i];
+        shared_out[i] = output[bid * input_size + i];
         shared_grad[i] = output_d[bid * input_size + i];
     }
     __syncthreads();
     
-    // Compute dot product between output and output_d
-    float dot_prod = 0.0f;
     for (int i = tid; i < input_size; i += blockDim.x) {
-        dot_prod += shared_output[i] * shared_grad[i];
-    }
-    
-    // Reduce to get final dot product
-    atomicAdd(&shared_mem[0], dot_prod);
-    __syncthreads();
-    
-    // Calculate gradient for each element
-    for (int i = tid; i < input_size; i += blockDim.x) {
-        input_d[bid * input_size + i] = shared_output[i] * 
-            (shared_grad[i] - shared_mem[0]);
+        float grad = 0.0f;
+        for (int j = 0; j < input_size; ++j) {
+            grad += shared_grad[j] * shared_out[j] * ((i == j) - shared_out[i]);
+        }
+        input_d[bid * input_size + i] = grad;
     }
 }
 
-void Softmax::forward(const float *input, float *output, dim3 blockSize) {
-    // One block per batch item, with shared memory for reduction
+void Softmax::forward(const float* input, float* output, dim3 blockSize) {
     dim3 gridSize(batch_size);
     size_t shared_mem_size = 2 * blockSize.x * sizeof(float);
     
-    softmax_forward_kernel<<<gridSize, blockSize, shared_mem_size>>>(
-        input, output, batch_size, input_size);
+    softmax_forward_kernel<<<gridSize, blockSize, shared_mem_size>>>(input, output, batch_size, input_size);
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
-    
-    CHECK(cudaMemcpy(this->output, output, batch_size * input_size * sizeof(float), 
-                    cudaMemcpyDeviceToDevice));
+    CHECK(cudaMemcpy(this->output, output, batch_size * input_size * sizeof(float), cudaMemcpyDeviceToDevice));
 }
 
-void Softmax::backward(const float *output_d, float *input_d, dim3 blockSize) {
-    // One block per batch item, with shared memory for output and gradients
+void Softmax::backward(const float* output_d, float* input_d, dim3 blockSize) {
     dim3 gridSize(batch_size);
-    size_t shared_mem_size = (2 * input_size + 1) * sizeof(float);
+    size_t shared_mem_size = (2 * input_size) * sizeof(float);
     
-    softmax_backward_kernel<<<gridSize, blockSize, shared_mem_size>>>(
-        this->output, output_d, input_d, batch_size, input_size);
+    softmax_backward_kernel<<<gridSize, blockSize, shared_mem_size>>>(this->output, output_d, input_d, 
+                                                                     batch_size, input_size);
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
 }
