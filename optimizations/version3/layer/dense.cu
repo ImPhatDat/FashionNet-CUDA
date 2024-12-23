@@ -29,30 +29,30 @@ void initialize_dense(float *d_weights, float *d_biases, int rows, int cols, dim
 }
 
 
+#define TILE_WIDTH 32  // You can adjust this based on your hardware and problem size
 __global__ void matmul_kernel(const float *A, const float *B, float *C, int M, int K, int N) {
     // Define block size for shared memory
-    const int TILE_SIZE = 32;  // You can adjust this based on your hardware and problem size
 
     // Shared memory for sub-matrices of A and B
-    __shared__ float As[TILE_SIZE][TILE_SIZE];
-    __shared__ float Bs[TILE_SIZE][TILE_SIZE];
+    __shared__ float As[TILE_WIDTH][TILE_WIDTH];
+    __shared__ float Bs[TILE_WIDTH][TILE_WIDTH];
 
     // Compute row and column index for the output matrix C
-    int row = blockIdx.y * TILE_SIZE + threadIdx.y;
-    int col = blockIdx.x * TILE_SIZE + threadIdx.x;
+    int row = blockIdx.y * TILE_WIDTH + threadIdx.y;
+    int col = blockIdx.x * TILE_WIDTH + threadIdx.x;
 
     float sum = 0.0f;
 
     // Iterate over sub-matrices
-    for (int t = 0; t < (K + TILE_SIZE - 1) / TILE_SIZE; ++t) {
+    for (int t = 0; t < (K + TILE_WIDTH - 1) / TILE_WIDTH; ++t) {
         // Load data into shared memory (ensure we do not go out of bounds)
-        if (row < M && t * TILE_SIZE + threadIdx.x < K)
-            As[threadIdx.y][threadIdx.x] = A[row * K + t * TILE_SIZE + threadIdx.x];
+        if (row < M && t * TILE_WIDTH + threadIdx.x < K)
+            As[threadIdx.y][threadIdx.x] = A[row * K + t * TILE_WIDTH + threadIdx.x];
         else
             As[threadIdx.y][threadIdx.x] = 0.0f;
 
-        if (col < N && t * TILE_SIZE + threadIdx.y < K)
-            Bs[threadIdx.y][threadIdx.x] = B[(t * TILE_SIZE + threadIdx.y) * N + col];
+        if (col < N && t * TILE_WIDTH + threadIdx.y < K)
+            Bs[threadIdx.y][threadIdx.x] = B[(t * TILE_WIDTH + threadIdx.y) * N + col];
         else
             Bs[threadIdx.y][threadIdx.x] = 0.0f;
 
@@ -60,7 +60,7 @@ __global__ void matmul_kernel(const float *A, const float *B, float *C, int M, i
         __syncthreads();
 
         // Perform the dot product of the sub-matrices
-        for (int k = 0; k < TILE_SIZE; ++k) {
+        for (int k = 0; k < TILE_WIDTH; ++k) {
             sum += As[threadIdx.y][k] * Bs[k][threadIdx.x];
         }
 
