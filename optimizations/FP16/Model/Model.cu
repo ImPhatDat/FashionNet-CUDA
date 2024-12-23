@@ -23,45 +23,46 @@ Model::~Model() {
 }
 
 
-void Model::forward(const float* batch_input, float* batch_output, dim3 blockSizes[]) {
-    float* x;
-    CHECK(cudaMalloc(&x, sizeof(float) * this->batch_size *  this->layers[0]->output_size));
+void Model::forward(const __half* batch_input, __half* batch_output, dim3 blockSizes[]) {
+    __half* x;
+    CHECK(cudaMalloc(&x, sizeof(__half) * this->batch_size *  this->layers[0]->output_size));
     this->layers[0]->forward(batch_input, x, blockSizes[0]);
 
-    float* tmp_x;
+    __half* tmp_x;
     for (int i = 1; i < this->num_layers; i++) {
-        CHECK(cudaMalloc(&tmp_x, sizeof(float) * this->batch_size *  this->layers[i]->output_size));
+        CHECK(cudaMalloc(&tmp_x, sizeof(__half) * this->batch_size *  this->layers[i]->output_size));
         this->layers[i]->forward(x, tmp_x, blockSizes[i]);
         CHECK(cudaFree(x));
         x = tmp_x;
     }
-    CHECK(cudaMemcpy(batch_output, x, sizeof(float) * this->batch_size * this->num_classes, cudaMemcpyDeviceToDevice));
+    CHECK(cudaMemcpy(batch_output, x, sizeof(__half) * this->batch_size * this->num_classes, cudaMemcpyDeviceToDevice));
     CHECK(cudaFree(x));
 }
 
-void Model::backward(const uint8_t* y_true, const float* y_pred, dim3 blockSizes[], Loss* loss, dim3 loss_blockSize) {
-    float* grad_x;
-    CHECK(cudaMalloc(&grad_x, sizeof(float) * this->batch_size * this->num_classes));
+void Model::backward(const uint8_t* y_true, const __half* y_pred, dim3 blockSizes[], Loss* loss, dim3 loss_blockSize) {
+    __half* grad_x;
+    CHECK(cudaMalloc(&grad_x, sizeof(__half) * this->batch_size * this->num_classes));
     loss->backward(y_true, y_pred, this->batch_size, this->num_classes, grad_x, loss_blockSize);
 
-    float* grad_tmp;
+    __half* grad_tmp;
     for (int i = num_layers - 1; i >= 0; i--) {
-        CHECK(cudaMalloc(&grad_tmp, sizeof(float) * this->batch_size * this->layers[i]->input_size));
+        CHECK(cudaMalloc(&grad_tmp, sizeof(__half) * this->batch_size * this->layers[i]->input_size));
         this->layers[i]->backward(grad_x, grad_tmp, blockSizes[i]);
         
         // print gradient
-        float *input_d_host = new float[batch_size * this->layers[i]->input_size];
-        CHECK(cudaMemcpy(input_d_host, grad_tmp, batch_size * this->layers[i]->input_size * sizeof(float), cudaMemcpyDeviceToHost));
-        printf("================Layer %d\n", i);
+        __half *input_d_host = new __half[batch_size * this->layers[i]->input_size];
+        CHECK(cudaMemcpy(input_d_host, grad_tmp, batch_size * this->layers[i]->input_size * sizeof(__half), cudaMemcpyDeviceToHost));
+        printf("=======================Layer %d\n", i);
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
-                printf("%f ", input_d_host[i * this->layers[i]->input_size + j]);
+                printf("%f ", __half2float(input_d_host[i * this->layers[i]->input_size + j]));
             }
             printf("\n");
         }
         delete[] input_d_host;
         // ends
-        
+
+
         CHECK(cudaFree(grad_x));
         grad_x = grad_tmp;
     }
@@ -69,7 +70,7 @@ void Model::backward(const uint8_t* y_true, const float* y_pred, dim3 blockSizes
     CHECK(cudaFree(grad_x));
 }
 
-void Model::update_weights(const float learning_rate, dim3 blockSizes[]) {
+void Model::update_weights(const __half learning_rate, dim3 blockSizes[]) {
     for (int i = 0; i < this->num_layers; i++) {
         this->layers[i]->update_weights(learning_rate, dim3(256));
     }
@@ -92,8 +93,19 @@ void Model::save_weights(std::string path) {
         file.write(reinterpret_cast<const char*>(&input_size), sizeof(input_size));
         file.write(reinterpret_cast<const char*>(&output_size), sizeof(output_size));
 
-        float* weights = this->layers[l]->get_weights();
-        float* biases = this->layers[l]->get_biases();
+        __half* half_weights = this->layers[l]->get_weights();
+        __half* half_fbiases = this->layers[l]->get_biases();
+
+        float* weights = new float[input_size * output_size];
+        float* biases = new float[output_size];
+
+        // Convert half-precision to float
+        for (int i = 0; i < input_size * output_size; i++) {
+            weights[i] = __half2float(half_weights[i]);
+        }
+        for (int i = 0; i < output_size; i++) {
+            biases[i] = __half2float(half_fbiases[i]);
+        }
 
         // Indicate if weights are present
         bool has_weights = weights != nullptr;
@@ -168,7 +180,18 @@ void Model::load_weights(std::string path) {
             file.read(reinterpret_cast<char*>(biases), output_size * sizeof(float));
         }
 
-        this->layers[l]->load_weights(weights, biases);
+        __half* half_weights = new __half[input_size * output_size];
+        __half* half_biases = new __half[output_size];
+
+        // Convert float to half-precision
+        for (int i = 0; i < input_size * output_size; i++) {
+            half_weights[i] = __float2half(weights[i]);
+        }
+        for (int i  =0; i < output_size; i++) {
+            half_biases[i] = __float2half(biases[i]);
+        }
+
+        this->layers[l]->load_weights(half_weights, half_biases);
 
         delete[] weights; // Clean up temporary allocation
         delete[] biases; // Clean up temporary allocation

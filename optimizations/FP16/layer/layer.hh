@@ -1,0 +1,35 @@
+#ifndef LAYER_H
+#define LAYER_H
+
+#include "../utils/helpers.hh"
+#include <iostream>
+#include <cstring>
+#include <stdio.h>
+#include <stdint.h>
+#pragma once
+
+class Layer
+{
+public:
+    int batch_size;
+    int input_size;
+    int output_size;
+    std::string name;    
+protected:
+    __half *input;  // Pointer to store input values
+    __half *output; // Pointer to store output values
+
+public:
+    Layer(int batch_size, int input_size, int output_size);
+    virtual ~Layer();
+    
+    virtual void forward(const __half *input, __half *output, dim3 blockSize) = 0;
+    virtual void backward(const __half *output_d, __half *input_d, dim3 blockSize) = 0;
+    virtual __half* get_weights() const;
+    virtual __half* get_biases() const;
+    virtual void update_weights(const __half learning_rate, dim3 blockSize);
+
+    virtual void load_weights(const __half* weights, const __half* biases);
+};
+
+#endif

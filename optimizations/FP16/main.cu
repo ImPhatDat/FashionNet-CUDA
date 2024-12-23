@@ -174,20 +174,20 @@ int main(int argc, char **argv)
     std::cout << "Total test images: " << test_set.getImageCount() << std::endl;
 
     int num_batches = train_set.getImageCount() / batch_size;
-    float **x_batches = new float *[num_batches];
+    __half **x_batches = new __half *[num_batches];
     uint8_t **y_batches = new uint8_t *[num_batches];
     for (int bi = 0; bi < num_batches; ++bi)
     {
-        x_batches[bi] = new float[batch_size * INPUT_SIZE];
+        x_batches[bi] = new __half[batch_size * INPUT_SIZE];
         y_batches[bi] = new uint8_t[batch_size];
     }
 
     int test_num_batches = test_set.getImageCount() / batch_size;
-    float **test_x_batches = new float *[test_num_batches];
+    __half **test_x_batches = new __half *[test_num_batches];
     uint8_t **test_y_batches = new uint8_t *[test_num_batches];
     for (int bi = 0; bi < test_num_batches; ++bi)
     {
-        test_x_batches[bi] = new float[batch_size * INPUT_SIZE];
+        test_x_batches[bi] = new __half[batch_size * INPUT_SIZE];
         test_y_batches[bi] = new uint8_t[batch_size];
     }
     test_set.prepareBatchesWithLabels(batch_size, INPUT_SIZE, test_x_batches, test_y_batches);
@@ -214,7 +214,7 @@ int main(int argc, char **argv)
     const int NUM_LAYERS = sizeof(layers) / sizeof(layers[0]);
 
     Model model(layers, NUM_LAYERS, batch_size, INPUT_SIZE, OUTPUT_SIZE);
-    CategoricalCrossentropy loss_obj(1e-7);
+    CategoricalCrossentropy loss_obj(__float2half(1e-7));
     Accuracy acc_obj;
     float loss_batch;
 
@@ -225,11 +225,13 @@ int main(int argc, char **argv)
     //tmp malloc
     uint8_t * d_y_true;
     CHECK(cudaMalloc(&d_y_true, sizeof(uint8_t) * batch_size));
-    float * d_x;
-    CHECK(cudaMalloc(&d_x, sizeof(float) * batch_size * INPUT_SIZE));
-    float * d_y_pred;
-    CHECK(cudaMalloc(&d_y_pred, sizeof(float) * batch_size * OUTPUT_SIZE));
-    float* h_y_pred = new float[batch_size * OUTPUT_SIZE];
+    __half * d_x;
+    CHECK(cudaMalloc(&d_x, sizeof(__half) * batch_size * INPUT_SIZE));
+    __half * d_y_pred;
+    CHECK(cudaMalloc(&d_y_pred, sizeof(__half) * batch_size * OUTPUT_SIZE));
+    float * h_y_pred = new float[batch_size * OUTPUT_SIZE];
+    __half * h_y_pred_half = new __half[batch_size * OUTPUT_SIZE];
+
 
     for (int epoch = 0; epoch < num_epoch; epoch++)
     {
@@ -239,24 +241,33 @@ int main(int argc, char **argv)
         printf("====================Epoch (%d/%d)====================\n", epoch + 1, num_epoch);
         // reshuffle train after each epoch
         train_set.shuffle(global_rng);
+
         train_set.prepareBatchesWithLabels(batch_size, INPUT_SIZE, x_batches, y_batches);
         loss_obj.reset_state();
         acc_obj.reset_state();
         for (int bi = 0; bi < num_batches; ++bi)
         {
-            CHECK(cudaMemcpy(d_x, x_batches[bi], sizeof(float) * batch_size * INPUT_SIZE, cudaMemcpyHostToDevice));
+
+            CHECK(cudaMemcpy(d_x, x_batches[bi], sizeof(__half) * batch_size * INPUT_SIZE, cudaMemcpyHostToDevice));
             model.forward(d_x, d_y_pred, blockSizes);
             CHECK(cudaMemcpy(d_y_true, y_batches[bi], sizeof(uint8_t) * batch_size, cudaMemcpyHostToDevice));
             
+
             loss_batch = loss_obj.forward(d_y_true, d_y_pred, batch_size, OUTPUT_SIZE, loss_blockSize);
             loss_obj.update_state(loss_batch);
 
-            CHECK(cudaMemcpy(h_y_pred, d_y_pred, sizeof(float) * batch_size * OUTPUT_SIZE, cudaMemcpyDeviceToHost));
+            // convert half to float
+            CHECK(cudaMemcpy(h_y_pred_half, d_y_pred, sizeof(__half) * batch_size * OUTPUT_SIZE, cudaMemcpyDeviceToHost));
+            for (int i = 0; i < batch_size * OUTPUT_SIZE; i++)
+            {
+                h_y_pred[i] = __half2float(h_y_pred_half[i]);
+            }
+
             acc_obj.update_state(h_y_pred, y_batches[bi], batch_size, OUTPUT_SIZE);
 
             model.backward(d_y_true, d_y_pred, blockSizes, &loss_obj, loss_blockSize);
 
-            model.update_weights(learning_rate, blockSizes);
+            model.update_weights(__float2half(learning_rate), blockSizes);
 
             if (bi % 100 == 0 || bi == num_batches - 1)
             {
@@ -275,14 +286,20 @@ int main(int argc, char **argv)
 
         for (int bi = 0; bi < test_num_batches; ++bi)
         {
-            CHECK(cudaMemcpy(d_x, test_x_batches[bi], sizeof(float) * batch_size * INPUT_SIZE, cudaMemcpyHostToDevice));
+            CHECK(cudaMemcpy(d_x, test_x_batches[bi], sizeof(__half) * batch_size * INPUT_SIZE, cudaMemcpyHostToDevice));
             model.forward(d_x, d_y_pred, blockSizes);
 
             CHECK(cudaMemcpy(d_y_true, test_y_batches[bi], sizeof(uint8_t) * batch_size, cudaMemcpyHostToDevice));
             loss_batch = loss_obj.forward(d_y_true, d_y_pred, batch_size, OUTPUT_SIZE, loss_blockSize);
             loss_obj.update_state(loss_batch);
             
-            CHECK(cudaMemcpy(h_y_pred, d_y_pred, sizeof(float) * batch_size * OUTPUT_SIZE, cudaMemcpyDeviceToHost));
+            // convert half to float
+            CHECK(cudaMemcpy(h_y_pred_half, d_y_pred, sizeof(__half) * batch_size * OUTPUT_SIZE, cudaMemcpyDeviceToHost));
+            for (int i = 0; i < batch_size * OUTPUT_SIZE; i++)
+            {
+                h_y_pred[i] = __half2float(h_y_pred_half[i]);
+            }
+
             acc_obj.update_state(h_y_pred, test_y_batches[bi], batch_size, OUTPUT_SIZE);
         }
         printf("Validation: loss - %f, acc - %f\n", loss_obj.compute_average_loss(), acc_obj.compute());
@@ -335,6 +352,7 @@ int main(int argc, char **argv)
     CHECK(cudaFree(d_y_true));
     CHECK(cudaFree(d_y_pred));
     delete[] h_y_pred;
+    delete[] h_y_pred_half;
     for (int i = 0; i < num_batches; ++i)
     {
         delete[] x_batches[i];
