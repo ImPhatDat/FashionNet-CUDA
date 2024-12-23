@@ -23,15 +23,10 @@ Model::~Model() {
 }
 
 
-void Model::forward(const float* batch_input, float*& batch_output, dim3 blockSizes[]) {
-    // batch_input is on host
-    float* batch_input_device;
-    CHECK(cudaMalloc(&batch_input_device, sizeof(float) * this->batch_size * this->input_size));
-    CHECK(cudaMemcpy(batch_input_device, batch_input, sizeof(float) * this->batch_size * this->input_size, cudaMemcpyHostToDevice));
-    
+void Model::forward(const float* batch_input, float* batch_output, dim3 blockSizes[]) {
     float* x;
     CHECK(cudaMalloc(&x, sizeof(float) * this->batch_size *  this->layers[0]->output_size));
-    this->layers[0]->forward(batch_input_device, x, blockSizes[0]);
+    this->layers[0]->forward(batch_input, x, blockSizes[0]);
 
     float* tmp_x;
     for (int i = 1; i < this->num_layers; i++) {
@@ -40,7 +35,8 @@ void Model::forward(const float* batch_input, float*& batch_output, dim3 blockSi
         CHECK(cudaFree(x));
         x = tmp_x;
     }
-    batch_output = x;
+    CHECK(cudaMemcpy(batch_output, x, sizeof(float) * this->batch_size * this->num_classes, cudaMemcpyDeviceToDevice));
+    CHECK(cudaFree(x));
 }
 
 void Model::backward(const uint8_t* y_true, const float* y_pred, dim3 blockSizes[], Loss* loss, dim3 loss_blockSize) {

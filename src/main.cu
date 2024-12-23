@@ -155,23 +155,19 @@ int main(int argc, char **argv)
     int num_batches = train_set.getImageCount() / batch_size;
     float **x_batches = new float *[num_batches];
     uint8_t **y_batches = new uint8_t *[num_batches];
-    float **y_pred_batches = new float *[num_batches];
     for (int bi = 0; bi < num_batches; ++bi)
     {
         x_batches[bi] = new float[batch_size * INPUT_SIZE];
         y_batches[bi] = new uint8_t[batch_size];
-        y_pred_batches[bi] = new float[batch_size * OUTPUT_SIZE];
     }
 
     int test_num_batches = test_set.getImageCount() / batch_size;
     float **test_x_batches = new float *[test_num_batches];
     uint8_t **test_y_batches = new uint8_t *[test_num_batches];
-    float **test_y_pred_batches = new float *[test_num_batches];
     for (int bi = 0; bi < test_num_batches; ++bi)
     {
         test_x_batches[bi] = new float[batch_size * INPUT_SIZE];
         test_y_batches[bi] = new uint8_t[batch_size];
-        test_y_pred_batches[bi] = new float[batch_size * OUTPUT_SIZE];
     }
     test_set.prepareBatchesWithLabels(batch_size, INPUT_SIZE, test_x_batches, test_y_batches);
 
@@ -190,6 +186,10 @@ int main(int argc, char **argv)
     HostTimer epoch_timer;
     HostTimer total_timer;
     total_timer.Start();
+
+    // tmp malloc
+    float *tmp_y_pred = new float[batch_size * OUTPUT_SIZE];
+
     for (int epoch = 0; epoch < num_epoch; epoch++)
     {
         // Start timing
@@ -203,13 +203,13 @@ int main(int argc, char **argv)
         acc_obj.reset_state();
         for (int bi = 0; bi < num_batches; ++bi)
         {
-            model.forward(x_batches[bi], y_pred_batches[bi]);
+            model.forward(x_batches[bi], tmp_y_pred);
 
-            loss_batch = loss_obj.forward(y_batches[bi], y_pred_batches[bi], batch_size, OUTPUT_SIZE);
+            loss_batch = loss_obj.forward(y_batches[bi], tmp_y_pred, batch_size, OUTPUT_SIZE);
             loss_obj.update_state(loss_batch);
-            acc_obj.update_state(y_pred_batches[bi], y_batches[bi], batch_size, OUTPUT_SIZE);
+            acc_obj.update_state(tmp_y_pred, y_batches[bi], batch_size, OUTPUT_SIZE);
 
-            model.backward(y_batches[bi], y_pred_batches[bi], &loss_obj);
+            model.backward(y_batches[bi], tmp_y_pred, &loss_obj);
             model.update_weights(learning_rate);
 
             if (bi % 100 == 0 || bi == num_batches - 1)
@@ -224,10 +224,10 @@ int main(int argc, char **argv)
 
         for (int bi = 0; bi < test_num_batches; ++bi)
         {
-            model.forward(test_x_batches[bi], test_y_pred_batches[bi]);
-            loss_batch = loss_obj.forward(test_y_batches[bi], test_y_pred_batches[bi], batch_size, OUTPUT_SIZE);
+            model.forward(test_x_batches[bi], tmp_y_pred);
+            loss_batch = loss_obj.forward(test_y_batches[bi], tmp_y_pred, batch_size, OUTPUT_SIZE);
             loss_obj.update_state(loss_batch);
-            acc_obj.update_state(test_y_pred_batches[bi], test_y_batches[bi], batch_size, OUTPUT_SIZE);
+            acc_obj.update_state(tmp_y_pred, test_y_batches[bi], batch_size, OUTPUT_SIZE);
         }
         printf("Validation: loss - %f, acc - %f\n", loss_obj.compute_average_loss(), acc_obj.compute());
 
@@ -276,24 +276,21 @@ int main(int argc, char **argv)
 
 
     // Deallocate
+    delete[] tmp_y_pred;
     for (int i = 0; i < num_batches; ++i)
     {
         delete[] x_batches[i];
-        delete[] y_pred_batches[i];
         delete[] y_batches[i];
     }
     delete[] x_batches;
-    delete[] y_pred_batches;
     delete[] y_batches;
 
     for (int i = 0; i < test_num_batches; ++i)
     {
         delete[] test_x_batches[i];
-        delete[] test_y_pred_batches[i];
         delete[] test_y_batches[i];
     }
     delete[] test_x_batches;
-    delete[] test_y_pred_batches;
     delete[] test_y_batches;
     return 0;
 }

@@ -23,7 +23,7 @@ Model::~Model() {
 }
 
 
-void Model::forward(const float* batch_input, float*& batch_output) {
+void Model::forward(const float* batch_input, float* batch_output) {
     float* tmp_x;
     float* x = new float[this->batch_size * this->layers[0]->output_size];
     this->layers[0]->forward(batch_input, x);
@@ -34,7 +34,8 @@ void Model::forward(const float* batch_input, float*& batch_output) {
         delete[] x;
         x = tmp_x;
     }
-    batch_output = x;
+    std::memcpy(batch_output, x, sizeof(float) * this->batch_size * this->num_classes);
+    delete[] x;
 }
 
 void Model::backward(const uint8_t* y_true, const float* y_pred, Loss* loss) {
