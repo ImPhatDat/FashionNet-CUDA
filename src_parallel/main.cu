@@ -109,10 +109,14 @@ int main(int argc, char **argv)
     int batch_size = 64; // Default value
     float learning_rate = 0.001;
     std::string checkpoint_path = "";
+
+    int blockSize1d = 256;
+    int blockSize2d = 32;
+
     int opt;
 
     // Parsing command-line arguments
-    while ((opt = getopt(argc, argv, "e:b:l:p:")) != -1)
+    while ((opt = getopt(argc, argv, "e:b:l:p:b1:b2:")) != -1)
     {
         switch (opt)
         {
@@ -128,8 +132,14 @@ int main(int argc, char **argv)
         case 'p':
             checkpoint_path = optarg; // Store the checkpoint path
             break;
+        case 'b1':
+            blockSize1d = atoi(optarg); // Convert argument to integer
+            break;
+        case 'b2':
+            blockSize2d = atoi(optarg); // Convert argument to integer
+            break;
         default:
-            fprintf(stderr, "Usage: %s [-e num_epoch] [-b batchsize] [-l learning_rate] [-p checkpoint_path]\n", argv[0]);
+            fprintf(stderr, "Usage: %s [-e num_epoch] [-b batchsize] [-l learning_rate] [-p checkpoint_path] [-b1 blockSize1d] [-b2 blockSize2d]\n", argv[0]);
             exit(EXIT_FAILURE);
         }
     }
@@ -169,23 +179,23 @@ int main(int argc, char **argv)
     test_set.prepareBatchesWithLabels(batch_size, INPUT_SIZE, test_x_batches, test_y_batches);
 
     Layer *layers[] = {
-        new Dense(batch_size, INPUT_SIZE, 128, dim3(256), true, seed),
+        new Dense(batch_size, INPUT_SIZE, 128, dim3(blockSize1d), true, seed),
         new ReLU(batch_size, 128),
-        new Dense(batch_size, 128, 128, dim3(256), true, seed),
+        new Dense(batch_size, 128, 128, dim3(blockSize1d), true, seed),
         new ReLU(batch_size, 128),
-        new Dense(batch_size, 128, OUTPUT_SIZE, dim3(256), true, seed),
+        new Dense(batch_size, 128, OUTPUT_SIZE, dim3(blockSize1d), true, seed),
         new Softmax(batch_size, OUTPUT_SIZE)};
 
     dim3 blockSizes[] = {
-        dim3(16, 16),
-        dim3(256),
-        dim3(16, 16),
-        dim3(256),
-        dim3(16, 16),
-        dim3(256),
+        dim3(blockSize2d, blockSize2d),
+        dim3(blockSize1d),
+        dim3(blockSize2d, blockSize2d),
+        dim3(blockSize1d),
+        dim3(blockSize2d, blockSize2d),
+        dim3(blockSize1d),
     };
 
-    dim3 loss_blockSize = dim3(256);
+    dim3 loss_blockSize = dim3(blockSize1d);
 
     const int NUM_LAYERS = sizeof(layers) / sizeof(layers[0]);
 
