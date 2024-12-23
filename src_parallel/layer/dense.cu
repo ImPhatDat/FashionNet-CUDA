@@ -130,6 +130,18 @@ void Dense::forward(const float *input, float *output, dim3 blockSize)
 }
 
 
+__global__ void grad_biases_kernel(const float *output_d, float *grad_biases, int batch_size, int output_size) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (col < output_size) {
+        float sum = 0.0f;
+        for (int row = 0; row < batch_size; ++row) {
+            sum += output_d[row * output_size + col];
+        }
+        grad_biases[col] = sum;
+    }
+}
+
 // Backward pass
 void Dense::backward(const float *output_d, float *input_d, dim3 blockSize)
 {
@@ -149,13 +161,11 @@ void Dense::backward(const float *output_d, float *input_d, dim3 blockSize)
     float *d_output_d_sum;
     CHECK(cudaMalloc(&d_output_d_sum, sizeof(float) * output_size));
     CHECK(cudaMemset(d_output_d_sum, 0, sizeof(float) * output_size));
-
+    
     dim3 gridSize((output_size + blockSize.x - 1) / blockSize.x);
-    add_bias_kernel<<<gridSize, blockSize>>>(d_output_d_sum, output_d, batch_size, output_size);
+    grad_biases_kernel<<<gridSize, blockSize>>>(output_d, grad_biases, batch_size, output_size);
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
-    CHECK(cudaMemcpy(grad_biases, d_output_d_sum, sizeof(float) * output_size, cudaMemcpyDeviceToDevice));
-    CHECK(cudaFree(d_output_d_sum));
 
     // Compute input_d: output_d * weights^T
     float *d_weights_transpose;
