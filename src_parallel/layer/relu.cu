@@ -27,11 +27,13 @@ void ReLU::forward(const float *input, float *output, dim3 blockSize) {
     CHECK(cudaMemcpy(this->input, input, sizeof(float) * total_size, cudaMemcpyDeviceToDevice));
     dim3 gridSize((batch_size * input_size + blockSize.x - 1) / blockSize.x);
     relu_forward_kernel<<<gridSize, blockSize>>>(input, output, total_size);
+    CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
 }
 
 void ReLU::backward(const float *output_d, float *input_d, dim3 blockSize) {
     dim3 gridSize((batch_size * input_size + blockSize.x - 1) / blockSize.x);
     relu_backward_kernel<<<gridSize, blockSize>>>(this->input, output_d, input_d, total_size);
+    CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
 }

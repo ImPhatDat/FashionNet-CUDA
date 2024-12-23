@@ -75,7 +75,6 @@ void transpose(const float *in, float *out, int M, int N, dim3 blockSize)
         M + blockSize.y - 1) / blockSize.y); // Grid size calculation
     // Launch the kernel
     transpose_kernel<<<gridSize, blockSize>>>(in, out, M, N);
-
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
 }
@@ -153,6 +152,8 @@ void Dense::backward(const float *output_d, float *input_d, dim3 blockSize)
 
     dim3 gridSize((output_size + blockSize.x - 1) / blockSize.x);
     add_bias_kernel<<<gridSize, blockSize>>>(d_output_d_sum, output_d, batch_size, output_size);
+    CHECK(cudaGetLastError());
+    CHECK(cudaDeviceSynchronize());
     CHECK(cudaMemcpy(grad_biases, d_output_d_sum, sizeof(float) * output_size, cudaMemcpyDeviceToDevice));
     CHECK(cudaFree(d_output_d_sum));
 
