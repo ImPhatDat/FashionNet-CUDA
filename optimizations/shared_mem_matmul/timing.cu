@@ -61,48 +61,63 @@ struct GpuTimer
 
 std::mt19937 global_rng(1); // Random number generator
 
+
+// check correct with host code
 bool checkCorrect(float* a, float* b, int shape1, int shape2) {
     float* tmpa = new float[shape1 * shape2];
     CHECK(cudaMemcpy(tmpa, a, sizeof(float) * shape1 * shape2, cudaMemcpyDeviceToHost));
-    float* tmpb = new float[shape1 * shape2];
-    CHECK(cudaMemcpy(tmpb, b, sizeof(float) * shape1 * shape2, cudaMemcpyDeviceToHost));
+    // float* tmpb = new float[shape1 * shape2];
+    // CHECK(cudaMemcpy(tmpb, b, sizeof(float) * shape1 * shape2, cudaMemcpyDeviceToHost));
 
     bool res = true;
     for (int i = 0; i < shape1; i++) {
         for (int j = 0; j < shape2; j++) {
             float aa = tmpa[i * shape2 + j];
-            float bb = tmpb[i * shape2 + j];
-            if (aa != bb) {
+            float bb = b[i * shape2 + j];
+            if (std::abs(aa - bb) >= 1e-3) {
                 printf("Missmatch at %d,%d: %f vs %f\n", i, j, aa, bb);
                 res = false;
             }
         }
     }
-
     delete[] tmpa;
-    delete[] tmpb;
     return res;
 }
+
 
 // Model configurations
 int main(int argc, char **argv)
 {
     printDeviceInfo();
     
-    int batch_size = 64;
-    int input_size = 784;
-    int output_size = 128;
+    int batch_size = 32;
+    int input_size = 64;
+    int output_size = 32;
     
-    Dense layer_to_time(batch_size, input_size, 128, true, global_rng);
+    Dense layer_to_time(batch_size, input_size, output_size, true, global_rng);
     
+    std::uniform_real_distribution<float> dis(-1, 1);
+
     float* random_input1 = new float[batch_size * input_size];
     for (int i = 0; i < batch_size * input_size; i++) {
-        random_input1[i] = i;
+        random_input1[i] = dis(global_rng);
     }
 
     float* random_input2 = new float[input_size * output_size];
-    for (int i = 0; i < batch_size * input_size; i++) {
-        random_input2[i] = i;
+    for (int i = 0; i < input_size * output_size; i++) {
+        random_input2[i] = dis(global_rng);
+    }
+
+    // host matmul
+    float * output_host = new float[batch_size * output_size];
+    for (int i = 0; i < batch_size; i++) {
+        for (int j = 0; j < output_size; j++) {
+            float sum = 0;
+            for (int k =0; k < input_size; k++) {
+                sum += random_input1[i * input_size + k] * random_input2[k * output_size + j];
+            }
+            output_host[i * output_size + j] = sum;
+        }
     }
 
     float* input_d;
@@ -111,15 +126,10 @@ int main(int argc, char **argv)
 
     float* input_d2;
     CHECK(cudaMalloc(&input_d2, sizeof(float) *  input_size * output_size));
-    CHECK(cudaMemcpy(input_d2, random_input1, sizeof(float) *  input_size * output_size, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(input_d2, random_input2, sizeof(float) *  input_size * output_size, cudaMemcpyHostToDevice));
 
     GpuTimer timer;
-    float* output_d_1;
-    CHECK(cudaMalloc(&output_d_1, sizeof(float) * batch_size * output_size));
-    timer.Start();
-    layer_to_time.matmul(input_d, input_d2, output_d_1, batch_size, input_size, output_size, dim3(32, 32));
-    timer.Stop();
-    printf("Verion 0 time: %f ms\n", timer.Elapsed());
+
 
     layer_to_time.version = 1;
     float* output_d_2;
@@ -127,10 +137,34 @@ int main(int argc, char **argv)
     timer.Start();
     layer_to_time.matmul(input_d, input_d2, output_d_2, batch_size, input_size, output_size, dim3(32, 32));
     timer.Stop();
+    // printf("Verion 1 time: %f ms\n", timer.Elapsed());
+
+    layer_to_time.version = 0;
+    float* output_d_1;
+    CHECK(cudaMalloc(&output_d_1, sizeof(float) * batch_size * output_size));
+    timer.Start();
+    layer_to_time.matmul(input_d, input_d2, output_d_1, batch_size, input_size, output_size, dim3(32, 32));
+    timer.Stop();
+    // printf("Verion 0 time: %f ms\n", timer.Elapsed());
+
+
+    layer_to_time.version = 1;
+    timer.Start();
+    layer_to_time.matmul(input_d, input_d2, output_d_2, batch_size, input_size, output_size, dim3(32, 32));
+    timer.Stop();
     printf("Verion 1 time: %f ms\n", timer.Elapsed());
 
-    bool is_correct = checkCorrect(output_d_1, output_d_2, batch_size, output_size);
-    printf("Correct? %s\n", is_correct ? "true" : "false");
+    layer_to_time.version = 0;
+    timer.Start();
+    layer_to_time.matmul(input_d, input_d2, output_d_1, batch_size, input_size, output_size, dim3(32, 32));
+    timer.Stop();
+    printf("Verion 0 time: %f ms\n", timer.Elapsed());
+
+    bool is_correct1 = checkCorrect(output_d_1, output_host, batch_size, output_size);
+    bool is_correct2 = checkCorrect(output_d_2, output_host, batch_size, output_size);
+    printf("Correct 1? %s\n", is_correct1 ? "true" : "false");
+    printf("Correct 2? %s\n", is_correct2 ? "true" : "false");
+
 
 
     CHECK(cudaFree(input_d));
@@ -140,6 +174,6 @@ int main(int argc, char **argv)
 
     delete[] random_input1;
     delete[] random_input2;
-
+    delete[] output_host;
     return 0;
 }
