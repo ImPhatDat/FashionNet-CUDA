@@ -26,7 +26,9 @@ __global__ void softmax_forward_kernel(const __half *input, __half *output, int 
     __half tmp;
     for (int i = 0; i < input_size; ++i) 
     {
-        tmp = hexp(__hsub(input[b * input_size + i], max_val));
+        // Exponentiate the difference between input and max_val (to avoid overflow)
+        float exp_val = expf(__half2float(__hsub(input[b * input_size + i], max_val))); // Convert to float, exponentiate, convert back to half
+        tmp = __float2half(exp_val);
         output[b * input_size + i] = tmp;
         sum_exp = __hadd(sum_exp, tmp);
     }
