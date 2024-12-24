@@ -92,12 +92,6 @@ struct HostTimer
 };
 
 
-
-const std::string train_imageFilePath = "data/fashion-mnist/train-images-idx3-ubyte";
-const std::string train_labelFilePath = "data/fashion-mnist/train-labels-idx1-ubyte";
-const std::string test_imageFilePath = "data/fashion-mnist/t10k-images-idx3-ubyte";
-const std::string test_labelFilePath = "data/fashion-mnist/t10k-labels-idx1-ubyte";
-
 std::mt19937 global_rng(1); // Random number generator
 // Model configurations
 const int INPUT_SIZE = 784; // Example: MNIST image input size
@@ -105,6 +99,8 @@ const int OUTPUT_SIZE = 10;
 
 int main(int argc, char **argv)
 {
+    printDeviceInfo();
+    std::string dataset_path = "";
     int num_epoch = 10;
     int batch_size = 64; // Default value
     float learning_rate = 0.001;
@@ -112,10 +108,13 @@ int main(int argc, char **argv)
     int opt;
 
     // Parsing command-line arguments
-    while ((opt = getopt(argc, argv, "e:b:l:p:")) != -1)
+    while ((opt = getopt(argc, argv, "d:e:b:l:p:")) != -1)
     {
         switch (opt)
         {
+        case 'd':
+            dataset_path = optarg; // Convert argument to integer
+            break;
         case 'e':
             num_epoch = atoi(optarg); // Convert argument to integer
             break;
@@ -129,11 +128,16 @@ int main(int argc, char **argv)
             checkpoint_path = optarg; // Store the checkpoint path
             break;
         default:
-            fprintf(stderr, "Usage: %s [-e num_epoch] [-b batchsize] [-l learning_rate] [-p checkpoint_path]\n", argv[0]);
+            fprintf(stderr, "Usage: %s [-d dataset_path] [-e num_epoch] [-b batchsize] [-l learning_rate] [-p checkpoint_path]\n", argv[0]);
             exit(EXIT_FAILURE);
         }
     }
-    printDeviceInfo();
+
+    const std::string train_imageFilePath = dataset_path + "train-images-idx3-ubyte";
+    const std::string train_labelFilePath = dataset_path + "train-labels-idx1-ubyte";
+    const std::string test_imageFilePath = dataset_path + "t10k-images-idx3-ubyte";
+    const std::string test_labelFilePath = dataset_path + "t10k-labels-idx1-ubyte";
+
 
     Layer *layers[] = {
         new Dense(batch_size, INPUT_SIZE, 128, true, global_rng),
