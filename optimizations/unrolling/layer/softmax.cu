@@ -16,6 +16,7 @@ __global__ void softmax_forward_kernel(const float *input, float *output, int ba
 
     // Compute max for numerical stability
     float max_val = input[b * input_size + 0];
+    #pragma unroll
     for (int i = 1; i < input_size; ++i) {
         max_val = fmaxf(max_val, input[b * input_size + i]);
     }
