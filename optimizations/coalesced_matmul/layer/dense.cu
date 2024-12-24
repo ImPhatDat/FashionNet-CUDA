@@ -18,7 +18,6 @@ __global__ void matmul_kernel(const float *A, const float *B, float *C, int M, i
         C[row * N + col] = sum;
     }
 }
-#define TILE_WIDTH 32  
 __global__ void matmul_kernel_version1(const float *A, const float *B, float *C, int M, int K, int N, int blockdim) {
     // Compute row and column index
     const int col = blockIdx.x * blockdim + (threadIdx.x / blockdim);
