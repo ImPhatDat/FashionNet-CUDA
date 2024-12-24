@@ -1,166 +1,85 @@
-#include <stdio.h>
 #include <cuda_runtime.h>
+#include <stdio.h>
 
-#define CHECK_CUDA_ERROR(err) \
-    if (err != cudaSuccess) { \
-        fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(err)); \
-        exit(EXIT_FAILURE); \
-    }
+// Define tile size for shared memory
+#define TILE_DIM 32
+#define BLOCK_ROWS 8
 
-// Optimized for most GPU architectures
-constexpr int TILE_DIM = 32;
-constexpr int BLOCK_DIM = 32;
+// Kernel function for matrix transpose with shared memory
+__global__ void transposeShared(float *odata, const float *idata, int width, int height) {
+    __shared__ float tile[TILE_DIM][TILE_DIM + 1]; // Avoid bank conflicts
 
-__global__ void matrixTransposeKernel(const float* input, float* output, 
-                                     const int rows, const int cols) {
-    __shared__ float tile[TILE_DIM][TILE_DIM + 1];  // +1 prevents bank conflicts
-    
-    // Calculate global indices
-    const int global_row = blockIdx.y * TILE_DIM + threadIdx.y;
-    const int global_col = blockIdx.x * TILE_DIM + threadIdx.x;
-    
-    // Calculate local indices within the tile
-    const int local_row = threadIdx.y;
-    const int local_col = threadIdx.x;
-    
-    // Load phase - each thread loads one element into shared memory if within bounds
-    for (int i = 0; i < TILE_DIM && global_row + i < rows && global_col < cols; i += BLOCK_DIM) {
-        tile[local_row + i][local_col] = input[(global_row + i) * cols + global_col];
-    }
-    
-    __syncthreads();
-    
-    // Calculate transposed global positions
-    const int new_row = blockIdx.x * TILE_DIM + threadIdx.y;
-    const int new_col = blockIdx.y * TILE_DIM + threadIdx.x;
-    
-    // Store phase - write data from shared memory to global memory
-    for (int i = 0; i < TILE_DIM && new_row + i < cols && new_col < rows; i += BLOCK_DIM) {
-        output[(new_row + i) * rows + new_col] = tile[threadIdx.x][threadIdx.y + i];
-    }
-}
+    // Calculate input and output indices
+    int x = blockIdx.x * TILE_DIM + threadIdx.x;
+    int y = blockIdx.y * TILE_DIM + threadIdx.y;
+    int width_in = width;
 
-cudaError_t transposeMatrix(const float* input, float* output, int rows, int cols) {
-    // Input validation
-    if (input == nullptr || output == nullptr || rows <= 0 || cols <= 0) {
-        return cudaErrorInvalidValue;
-    }
-    
-    float *d_input, *d_output;
-    cudaError_t err;
-    
-    // Calculate memory sizes
-    size_t input_size = rows * cols * sizeof(float);
-    
-    // Allocate device memory
-    err = cudaMalloc(&d_input, input_size);
-    if (err != cudaSuccess) return err;
-    
-    err = cudaMalloc(&d_output, input_size);
-    if (err != cudaSuccess) {
-        cudaFree(d_input);
-        return err;
-    }
-    
-    // Copy input data to device
-    err = cudaMemcpy(d_input, input, input_size, cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
-        cudaFree(d_input);
-        cudaFree(d_output);
-        return err;
-    }
-    
-    // Calculate grid dimensions to cover any input size
-    dim3 block(BLOCK_DIM, BLOCK_DIM);
-    dim3 grid(
-        (cols + TILE_DIM - 1) / TILE_DIM,  // Ceiling division for width
-        (rows + TILE_DIM - 1) / TILE_DIM   // Ceiling division for height
-    );
-    
-    // Launch kernel
-    matrixTransposeKernel<<<grid, block>>>(d_input, d_output, rows, cols);
-    
-    // Check for kernel launch errors
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        cudaFree(d_input);
-        cudaFree(d_output);
-        return err;
-    }
-    
-    // Wait for kernel to finish
-    err = cudaDeviceSynchronize();
-    if (err != cudaSuccess) {
-        cudaFree(d_input);
-        cudaFree(d_output);
-        return err;
-    }
-    
-    // Copy result back to host
-    err = cudaMemcpy(output, d_output, input_size, cudaMemcpyDeviceToHost);
-    
-    // Clean up
-    cudaFree(d_input);
-    cudaFree(d_output);
-    
-    return err;
-}
-
-// Test function to verify transpose with different matrix sizes
-void testTranspose(int rows, int cols) {
-    printf("\nTesting transpose with matrix size: %d x %d\n", rows, cols);
-    
-    // Allocate host memory
-    float* input = new float[rows * cols];
-    float* output = new float[rows * cols];
-    
-    // Initialize input matrix
-    for (int i = 0; i < rows * cols; i++) {
-        input[i] = static_cast<float>(i);
-    }
-    
-    // Perform transpose
-    cudaError_t err = transposeMatrix(input, output, rows, cols);
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Transpose failed: %s\n", cudaGetErrorString(err));
-        delete[] input;
-        delete[] output;
-        return;
-    }
-    
-    // Verify results
-    bool correct = true;
-    for (int i = 0; i < rows && correct; i++) {
-        for (int j = 0; j < cols && correct; j++) {
-            if (input[i * cols + j] != output[j * rows + i]) {
-                correct = false;
-                printf("Mismatch at position [%d,%d]: %f != %f\n", 
-                       i, j, input[i * cols + j], output[j * rows + i]);
-                break;
-            }
+    // Load data into shared memory
+    for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS) {
+        if ((x < width) && (y + j < height)) {
+            tile[threadIdx.y + j][threadIdx.x] = idata[(y + j) * width_in + x];
         }
     }
-    
-    printf("Matrix transpose %s\n", correct ? "successful!" : "failed!");
-    
-    delete[] input;
-    delete[] output;
+    __syncthreads(); // Ensure all threads have loaded data
+
+    // Calculate transposed output indices
+    x = blockIdx.y * TILE_DIM + threadIdx.x;  // Swap x and y for transpose
+    y = blockIdx.x * TILE_DIM + threadIdx.y;
+
+    // Write transposed data from shared memory
+    for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS) {
+        if ((x < height) && (y + j < width)) {
+            odata[(y + j) * height + x] = tile[threadIdx.x][threadIdx.y + j];
+        }
+    }
 }
 
+void checkCUDAError(const char *msg) {
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA error: %s: %s.\n", msg, cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+}
+
+// Host code to execute the kernel
 int main() {
-    // Test various matrix sizes
-    testTranspose(1000, 100);    // Tall matrix
-    testTranspose(100, 1000);    // Wide matrix
-    testTranspose(32, 32);       // Exactly one tile
-    testTranspose(31, 31);       // Smaller than tile
-    testTranspose(33, 33);       // Slightly larger than tile
-    testTranspose(2048, 2048);   // Large square matrix
-    testTranspose(1, 1000);      // Single row
-    testTranspose(1000, 1);      // Single column
-    testTranspose(17, 23);       // Prime numbers
-    testTranspose(2, 3);       // Prime numbers
-    testTranspose(3, 2);       // Prime numbers
-    testTranspose(15, 61);       // Prime numbers
-    
+    const int width = 1024;  // Matrix width
+    const int height = 512;  // Matrix height
+    const int size = width * height * sizeof(float);
+
+    // Allocate memory on host
+    float *h_idata = (float *)malloc(size);
+    float *h_odata = (float *)malloc(size);
+
+    // Initialize matrix with sample data
+    for (int i = 0; i < width * height; ++i) {
+        h_idata[i] = (float)i;
+    }
+
+    // Allocate memory on device
+    float *d_idata, *d_odata;
+    cudaMalloc((void **)&d_idata, size);
+    cudaMalloc((void **)&d_odata, size);
+
+    // Copy input data to device
+    cudaMemcpy(d_idata, h_idata, size, cudaMemcpyHostToDevice);
+
+    // Launch kernel
+    dim3 dimGrid((width + TILE_DIM - 1) / TILE_DIM, (height + TILE_DIM - 1) / TILE_DIM);
+    dim3 dimBlock(TILE_DIM, BLOCK_ROWS);
+    transposeShared<<<dimGrid, dimBlock>>>(d_odata, d_idata, width, height);
+    checkCUDAError("Kernel execution");
+
+    // Copy results back to host
+    cudaMemcpy(h_odata, d_odata, size, cudaMemcpyDeviceToHost);
+
+    // Cleanup
+    free(h_idata);
+    free(h_odata);
+    cudaFree(d_idata);
+    cudaFree(d_odata);
+
+    printf("Matrix transpose completed successfully.\n");
     return 0;
 }

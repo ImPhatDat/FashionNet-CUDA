@@ -14,41 +14,41 @@ __global__ void transpose_kernel(const float *in, float *out, int M, int N)
 }
 
 #define TILE_DIM 32
-#define BLOCK_DIM 32
-__global__ void transpose_kernel_version1(const float* input, float* output, 
-                                     const int rows, const int cols, int block_dim) {
-    __shared__ float tile[TILE_DIM][TILE_DIM + 1];  // +1 prevents bank conflicts
-    
-    // Calculate global indices
-    const int global_row = blockIdx.y * TILE_DIM + threadIdx.y;
-    const int global_col = blockIdx.x * TILE_DIM + threadIdx.x;
-    
-    // Calculate local indices within the tile
-    const int local_row = threadIdx.y;
-    const int local_col = threadIdx.x;
-    
-    // Load phase - each thread loads one element into shared memory if within bounds
-    for (int i = 0; i < TILE_DIM && global_row + i < rows && global_col < cols; i += block_dim) {
-        tile[local_row + i][local_col] = input[(global_row + i) * cols + global_col];
+#define BLOCK_DIM 8
+__global__ void transpose_kernel_version1( const float *in, float *out, int width, int height) {
+    __shared__ float tile[TILE_DIM][TILE_DIM + 1]; // Avoid bank conflicts
+
+    // Calculate input and output indices
+    int x = blockIdx.x * TILE_DIM + threadIdx.x;
+    int y = blockIdx.y * TILE_DIM + threadIdx.y;
+    int width_in = width;
+
+    // Load data into shared memory
+    for (int j = 0; j < TILE_DIM; j += BLOCK_DIM) {
+        if ((x < width) && (y + j < height)) {
+            tile[threadIdx.y + j][threadIdx.x] = in[(y + j) * width_in + x];
+        }
     }
-    
-    __syncthreads();
-    
-    // Calculate transposed global positions
-    const int new_row = blockIdx.x * TILE_DIM + threadIdx.y;
-    const int new_col = blockIdx.y * TILE_DIM + threadIdx.x;
-    
-    // Store phase - write data from shared memory to global memory
-    for (int i = 0; i < TILE_DIM && new_row + i < cols && new_col < rows; i += block_dim) {
-        output[(new_row + i) * rows + new_col] = tile[threadIdx.x][threadIdx.y + i];
+    __syncthreads(); // Ensure all threads have loaded data
+
+    // Calculate transposed output indices
+    x = blockIdx.y * TILE_DIM + threadIdx.x;  // Swap x and y for transpose
+    y = blockIdx.x * TILE_DIM + threadIdx.y;
+
+    // Write transposed data from shared memory
+    for (int j = 0; j < TILE_DIM; j += BLOCK_DIM) {
+        if ((x < height) && (y + j < width)) {
+            out[(y + j) * height + x] = tile[threadIdx.x][threadIdx.y + j];
+        }
     }
 }
+
 void transpose(const float *in, float *out, int M, int N) //, dim3 blockSize) use fixed blockSize
 {
-    dim3 blockSize(BLOCK_DIM, BLOCK_DIM);
-    dim3 gridSize((N + BLOCK_DIM - 1) / BLOCK_DIM, (M + BLOCK_DIM - 1) / BLOCK_DIM); // Grid size calculation
+    dim3 blockSize(TILE_DIM, BLOCK_DIM);
+    dim3 gridSize((N + TILE_DIM - 1) / TILE_DIM, (M + TILE_DIM - 1) / TILE_DIM); // Grid size calculation
     // Launch the kernel
-    transpose_kernel_version1<<<gridSize, blockSize>>>(in, out, M, N, BLOCK_DIM);
+    transpose_kernel_version1<<<gridSize, blockSize>>>(in, out, N, M);
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
 }
