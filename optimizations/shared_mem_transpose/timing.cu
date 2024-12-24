@@ -89,8 +89,8 @@ int main(int argc, char **argv)
 {
     printDeviceInfo();
     
-    int batch_size = 64;
-    int input_size = 784;
+    int batch_size = 1024;
+    int input_size = 512;
     
     Dense layer_to_time(batch_size, input_size, 128, true, global_rng);
     
@@ -98,18 +98,18 @@ int main(int argc, char **argv)
     for (int i = 0; i < batch_size * input_size; i++) {
         random_input[i] = i;
     }
+    GpuTimer timer;
 
     float* input_d;
     CHECK(cudaMalloc(&input_d, sizeof(float) * batch_size * input_size));
     CHECK(cudaMemcpy(input_d, random_input, sizeof(float) * batch_size * input_size, cudaMemcpyHostToDevice));
 
-    GpuTimer timer;
     float* output_d_1;
     CHECK(cudaMalloc(&output_d_1, sizeof(float) * batch_size * input_size));
     timer.Start();
     layer_to_time.transpose(input_d, output_d_1, batch_size, input_size, dim3(32, 32));
     timer.Stop();
-    printf("Verion 0 time: %f ms\n", timer.Elapsed());
+    // printf("Verion 0 time: %f ms\n", timer.Elapsed());
 
     layer_to_time.version = 1;
     float* output_d_2;
@@ -117,7 +117,21 @@ int main(int argc, char **argv)
     timer.Start();
     layer_to_time.transpose(input_d, output_d_2, batch_size, input_size, dim3(32, 32));
     timer.Stop();
+    // printf("Verion 1 time: %f ms\n", timer.Elapsed());
+
+    layer_to_time.version = 1;
+    timer.Start();
+    layer_to_time.transpose(input_d, output_d_2, batch_size, input_size, dim3(32, 32));
+    timer.Stop();
     printf("Verion 1 time: %f ms\n", timer.Elapsed());
+
+    layer_to_time.version = 0;
+    timer.Start();
+    layer_to_time.transpose(input_d, output_d_1, batch_size, input_size, dim3(32, 32));
+    timer.Stop();
+    printf("Verion 0 time: %f ms\n", timer.Elapsed());
+
+
 
     bool is_correct = checkCorrect(output_d_1, output_d_2, batch_size, input_size);
     printf("Correct? %s\n", is_correct ? "true" : "false");
