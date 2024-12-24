@@ -25,11 +25,11 @@ public:
     
     virtual void forward(const __half *input, __half *output, dim3 blockSize) = 0;
     virtual void backward(const __half *output_d, __half *input_d, dim3 blockSize) = 0;
-    virtual __half* get_weights() const;
-    virtual __half* get_biases() const;
+    virtual float* get_weights() const;
+    virtual float* get_biases() const;
     virtual void update_weights(const __half learning_rate, dim3 blockSize);
 
-    virtual void load_weights(const __half* weights, const __half* biases);
+    virtual void load_weights(const float* weights, const float* biases);
 };
 
 #endif

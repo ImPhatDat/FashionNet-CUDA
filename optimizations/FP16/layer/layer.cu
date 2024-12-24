@@ -15,9 +15,9 @@ Layer::~Layer()
     CHECK(cudaFree(output));
 }
 
-__half* Layer::get_weights() const { return nullptr; }
-__half* Layer::get_biases() const { return nullptr; }
+float* Layer::get_weights() const { return nullptr; }
+float* Layer::get_biases() const { return nullptr; }
 
 void Layer::update_weights(const __half learning_rate, dim3 blockSize) {}
 
-void Layer::load_weights(const __half* weights, const __half* biases) {}
+void Layer::load_weights(const float* weights, const float* biases) {}

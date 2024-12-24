@@ -79,19 +79,8 @@ void Model::save_weights(std::string path) {
         file.write(reinterpret_cast<const char*>(&input_size), sizeof(input_size));
         file.write(reinterpret_cast<const char*>(&output_size), sizeof(output_size));
 
-        __half* half_weights = this->layers[l]->get_weights();
-        __half* half_fbiases = this->layers[l]->get_biases();
-
-        float* weights = new float[input_size * output_size];
-        float* biases = new float[output_size];
-
-        // Convert half-precision to float
-        for (int i = 0; i < input_size * output_size; i++) {
-            weights[i] = __half2float(half_weights[i]);
-        }
-        for (int i = 0; i < output_size; i++) {
-            biases[i] = __half2float(half_fbiases[i]);
-        }
+        float* weights = this->layers[l]->get_weights();
+        float* biases = this->layers[l]->get_biases();
 
         // Indicate if weights are present
         bool has_weights = weights != nullptr;
@@ -166,18 +155,7 @@ void Model::load_weights(std::string path) {
             file.read(reinterpret_cast<char*>(biases), output_size * sizeof(float));
         }
 
-        __half* half_weights = new __half[input_size * output_size];
-        __half* half_biases = new __half[output_size];
-
-        // Convert float to half-precision
-        for (int i = 0; i < input_size * output_size; i++) {
-            half_weights[i] = __float2half(weights[i]);
-        }
-        for (int i  =0; i < output_size; i++) {
-            half_biases[i] = __float2half(biases[i]);
-        }
-
-        this->layers[l]->load_weights(half_weights, half_biases);
+        this->layers[l]->load_weights(weights, biases);
 
         delete[] weights; // Clean up temporary allocation
         delete[] biases; // Clean up temporary allocation

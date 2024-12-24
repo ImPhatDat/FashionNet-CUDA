@@ -102,20 +102,38 @@ int main(int argc, char **argv) {
 
     // Predict using your model
 
-    float* input_d;
-    float* output_d;
-    CHECK(cudaMalloc(&input_d, INPUT_SIZE * sizeof(float)));
-    CHECK(cudaMalloc(&output_d, OUTPUT_SIZE * sizeof(float)));
+    __half* input_d_half;
+    half* input_half = new __half[INPUT_SIZE];
+    __half* output_d_half;
+    CHECK(cudaMalloc(&input_d_half, INPUT_SIZE * sizeof(__half)));
+    CHECK(cudaMalloc(&output_d_half, OUTPUT_SIZE * sizeof(__half)));
 
-    CHECK(cudaMemcpy(input_d, input_image, INPUT_SIZE * sizeof(float), cudaMemcpyHostToDevice));
+    // float to half
+    for (int i = 0; i < INPUT_SIZE; ++i) {
+        input_half[i] = __float2half(input_image[i]);
+    }
 
-    model.forward(input_d, output_d, blockSizes);
+    // Copy the input image to the device
+    CHECK(cudaMemcpy(input_d_half, input_half, INPUT_SIZE * sizeof(__half), cudaMemcpyHostToDevice));
+
+    model.forward(input_d_half, output_d_half, blockSizes);
+
+    half* output_half = new __half[OUTPUT_SIZE];
     float *output = new float[OUTPUT_SIZE];
 
-    CHECK(cudaMemcpy(output, output_d, OUTPUT_SIZE * sizeof(float), cudaMemcpyDeviceToHost));
+    // device to host
+    CHECK(cudaMemcpy(output_half, output_d_half, OUTPUT_SIZE * sizeof(__half), cudaMemcpyDeviceToHost));
 
-    CHECK(cudaFree(input_d));
-    CHECK(cudaFree(output_d));
+    // half to float
+    for (int i = 0; i < OUTPUT_SIZE; ++i) {
+        output[i] = __half2float(output_half[i]);
+    }
+
+    // Free memory
+    delete[] input_half;
+    delete[] output_half;
+    CHECK(cudaFree(input_d_half));
+    CHECK(cudaFree(output_d_half));
 
 
     // Find the class with the highest score

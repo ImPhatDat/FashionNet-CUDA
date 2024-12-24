@@ -180,23 +180,47 @@ void Dense::update_weights(__half learning_rate, dim3 blockSize) {
     CHECK(cudaDeviceSynchronize());
 }
 
-void Dense::load_weights(const __half* weights, const __half* biases) {
+void Dense::load_weights(const float* weights, const float* biases) {
     if (weights != nullptr && biases != nullptr) {
-        CHECK(cudaMemcpy(this->weights, weights, sizeof(__half) * this->input_size * this->output_size, cudaMemcpyHostToDevice));
-        CHECK(cudaMemcpy(this->biases, biases, sizeof(__half) * this->output_size, cudaMemcpyHostToDevice));
+        __half* host_weights = new __half[this->input_size * this->output_size];
+        for (int i = 0; i < this->input_size * this->output_size; i++) {
+            host_weights[i] = __float2half(weights[i]);
+        }
+
+        __half* host_biases = new __half[this->output_size];
+        for (int i = 0; i < this->output_size; i++) {
+            host_biases[i] = __float2half(biases[i]);
+        }
+
+        CHECK(cudaMemcpy(this->weights, host_weights, sizeof(__half) * this->input_size * this->output_size, cudaMemcpyHostToDevice));
+        CHECK(cudaMemcpy(this->biases, host_biases, sizeof(__half) * this->output_size, cudaMemcpyHostToDevice));
+
+        delete[] host_weights;
+        delete[] host_biases;
     }
     else {
         std::cerr << "Can't load weights with nullptr" << std::endl;
     }
 }
 
-__half* Dense::get_weights() const {
+float* Dense::get_weights() const {
     __half* h_weights = new __half[this->input_size * this->output_size];
     CHECK(cudaMemcpy(h_weights, this->weights, sizeof(__half) * this->input_size * this->output_size, cudaMemcpyDeviceToHost));
-    return h_weights;
+    float* h_float_weights = new float[this->input_size * this->output_size];
+    for (int i = 0; i < this->input_size * this->output_size; i++) {
+        h_float_weights[i] = __half2float(h_weights[i]);
+    }
+    delete[] h_weights;
+    return h_float_weights;
 }
-__half* Dense::get_biases() const {
+
+float* Dense::get_biases() const {
     __half* h_biases = new __half[this->output_size];
     CHECK(cudaMemcpy(h_biases, this->biases, sizeof(__half) * this->output_size, cudaMemcpyDeviceToHost));
-    return h_biases;
+    float* h_float_biases = new float[this->output_size];
+    for (int i = 0; i < this->output_size; i++) {
+        h_float_biases[i] = __half2float(h_biases[i]);
+    }
+    delete[] h_biases;
+    return h_float_biases;
 }

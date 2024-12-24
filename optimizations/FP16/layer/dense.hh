@@ -35,14 +35,14 @@ public:
     Dense(int batch_size, int input_size, int output_size, dim3 blockSize, bool init, unsigned long seed);
     ~Dense();
 
-    __half *get_weights() const override;
-    __half *get_biases() const override;
+    float *get_weights() const override;
+    float *get_biases() const override;
 
     void forward(const __half *input, __half *output, dim3 blockSize) override;
     void backward(const __half *output_d, __half *input_d, dim3 blockSize) override;
     void update_weights(const __half learning_rate, dim3 blockSize) override;
 
-    void load_weights(const __half* weights, const __half* biases) override;
+    void load_weights(const float* weights, const float* biases) override;
 
 };
 
