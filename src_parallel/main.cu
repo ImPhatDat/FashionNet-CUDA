@@ -92,7 +92,6 @@ struct HostTimer
 };
 
 
-unsigned long seed = 1;
 std::mt19937 global_rng(1); // Random number generator
 
 // Model configurations
@@ -193,11 +192,11 @@ int main(int argc, char **argv)
     test_set.prepareBatchesWithLabels(batch_size, INPUT_SIZE, test_x_batches, test_y_batches);
 
     Layer *layers[] = {
-        new Dense(batch_size, INPUT_SIZE, 128, dim3(blockSize1d), true, seed),
+        new Dense(batch_size, INPUT_SIZE, 128, true, global_rng),
         new ReLU(batch_size, 128),
-        new Dense(batch_size, 128, 128, dim3(blockSize1d), true, seed),
+        new Dense(batch_size, 128, 128, true, global_rng),
         new ReLU(batch_size, 128),
-        new Dense(batch_size, 128, OUTPUT_SIZE, dim3(blockSize1d), true, seed),
+        new Dense(batch_size, 128, OUTPUT_SIZE, true, global_rng),
         new Softmax(batch_size, OUTPUT_SIZE)};
 
     dim3 blockSizes[] = {
@@ -264,11 +263,6 @@ int main(int argc, char **argv)
                        bi, num_batches - 1,
                        loss_obj.compute_average_loss(), acc_obj.compute());
             }
-            int dum;
-            printf("batch %d\n", bi);
-            scanf("%d", &dum);
-            if (bi >= 100)
-                break;
         }
         loss_obj.reset_state();
         acc_obj.reset_state();
@@ -292,7 +286,6 @@ int main(int argc, char **argv)
 
         // Get and print the elapsed time
         printf("Epoch time: %f seconds\n", epoch_timer.Elapsed());
-        break;
     }
     total_timer.Stop();
     printf("Total time: %f seconds\n", total_timer.Elapsed());

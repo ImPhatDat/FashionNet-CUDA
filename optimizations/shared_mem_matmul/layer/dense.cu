@@ -1,30 +1,28 @@
 #include "../../../src_parallel/layer/dense.hh"
 
-__global__ void initialize_weights_kernel(float *weights, int rows, int cols, float limit, unsigned long seed) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int total = rows * cols;
+// glorot uniform
+void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
+{
+    // Calculate the Glorot Uniform limit
+    float limit = std::sqrt(6.0f / (rows + cols)); 
 
-    if (idx >= total) return;
-    curandState state;
-    curand_init(seed, idx, 0, &state);
+    // Create a uniform distribution between -limit and +limit
+    std::uniform_real_distribution<float> dis(-limit, limit);
 
-    // random in range [-limit, +limit]
-    weights[idx] = curand_uniform(&state) * 2.0f * limit - limit;
-}
-
-// Glorot Uniform initialization
-void initialize_dense(float *d_weights, float *d_biases, int rows, int cols, dim3 blockSize, unsigned long seed) {
-    // Glorot Uniform limit
-    float limit = std::sqrt(6.0f / (rows + cols));
-
-    int total_weights = rows * cols;
-    dim3 gridSizeWeights((total_weights + blockSize.x - 1) / blockSize.x);
-    initialize_weights_kernel<<<gridSizeWeights, blockSize>>>(d_weights, rows, cols, limit, seed);
-    CHECK(cudaGetLastError());
-    CHECK(cudaDeviceSynchronize());
+    // Initialize weights
+    for (int i = 0; i < rows; ++i)
+    {
+        for (int j = 0; j < cols; ++j)
+        {
+            weights[i * cols + j] = dis(gen);
+        }
+    }
 
     // Initialize biases to 0
-    CHECK(cudaMemset(d_biases, 0, cols * sizeof(float)));
+    for (int j = 0; j < cols; ++j)
+    {
+        biases[j] = 0.0f;
+    }
 }
 
 
@@ -103,7 +101,7 @@ void transpose(const float *in, float *out, int M, int N, dim3 blockSize)
 }
 
 
-Dense::Dense(int batch_size, int input_size, int output_size, dim3 blockSize, bool init, unsigned long seed) : Layer(batch_size, input_size, output_size)
+Dense::Dense(int batch_size, int input_size, int output_size, bool init, std::mt19937 &gen) : Layer(batch_size, input_size, output_size)
 {
     this->name = "dense";
     // Allocate and initialize weights and biases
@@ -113,8 +111,18 @@ Dense::Dense(int batch_size, int input_size, int output_size, dim3 blockSize, bo
     CHECK(cudaMalloc(&grad_weights, sizeof(float) * input_size * output_size));
     CHECK(cudaMalloc(&grad_biases, sizeof(float) * output_size));
 
-    if (init)
-        initialize_dense(weights, biases, input_size, output_size, blockSize, seed); // Initialize weights
+    if (init) {
+        float* host_weights = new float[input_size * output_size];
+        float* host_biases = new float[input_size * output_size];
+        initialize_dense(host_weights, host_biases, input_size, output_size, gen); // Initialize weights
+
+        CHECK(cudaMemcpy(weights, host_weights, sizeof(float) * input_size * output_size, cudaMemcpyHostToDevice));
+        CHECK(cudaMemcpy(biases, host_biases, sizeof(float) * output_size, cudaMemcpyHostToDevice));
+
+
+        delete[] host_weights;
+        delete[] host_biases;
+    }
 }
 
 Dense::~Dense()

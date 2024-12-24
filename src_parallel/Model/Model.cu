@@ -49,19 +49,6 @@ void Model::backward(const uint8_t* y_true, const float* y_pred, dim3 blockSizes
         CHECK(cudaMalloc(&grad_tmp, sizeof(float) * this->batch_size * this->layers[i]->input_size));
         this->layers[i]->backward(grad_x, grad_tmp, blockSizes[i]);
         
-        // print gradient
-        float *input_d_host = new float[batch_size * this->layers[i]->input_size];
-        CHECK(cudaMemcpy(input_d_host, grad_tmp, batch_size * this->layers[i]->input_size * sizeof(float), cudaMemcpyDeviceToHost));
-        printf("================Layer %d\n", i);
-        for (int i = 0; i < 3; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                printf("%f ", input_d_host[i * this->layers[i]->input_size + j]);
-            }
-            printf("\n");
-        }
-        delete[] input_d_host;
-        // ends
-        
         CHECK(cudaFree(grad_x));
         grad_x = grad_tmp;
     }

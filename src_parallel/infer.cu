@@ -13,6 +13,7 @@ const int INPUT_SIZE = 784; // Example: MNIST image input size
 const int OUTPUT_SIZE = 10;
 const int BATCH_SIZE = 1; // Single image for inference
 
+std::mt19937 global_rng(1); // Random number generator
 int main(int argc, char **argv) {
     std::string checkpoint_path = "";
     std::string img_path = "";
@@ -73,15 +74,13 @@ int main(int argc, char **argv) {
     }
 
     // Define the model layers
-    std::mt19937 global_rng(1); // Random number generator
-    unsigned long seed = 1;
 
     Layer *layers[] = {
-        new Dense(BATCH_SIZE, INPUT_SIZE, 128, dim3(blockSize1d), false, seed),
+        new Dense(BATCH_SIZE, INPUT_SIZE, 128, false, global_rng),
         new ReLU(BATCH_SIZE, 128),
-        new Dense(BATCH_SIZE, 128, 128, dim3(blockSize1d), false, seed),
+        new Dense(BATCH_SIZE, 128, 128, false, global_rng),
         new ReLU(BATCH_SIZE, 128),
-        new Dense(BATCH_SIZE, 128, OUTPUT_SIZE, dim3(blockSize1d), false, seed),
+        new Dense(BATCH_SIZE, 128, OUTPUT_SIZE, false, global_rng),
         new Softmax(BATCH_SIZE, OUTPUT_SIZE)};
 
     dim3 blockSizes[] = {

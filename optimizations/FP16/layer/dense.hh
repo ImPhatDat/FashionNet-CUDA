@@ -32,7 +32,7 @@ private:
     __half *grad_biases = nullptr;
 
 public:
-    Dense(int batch_size, int input_size, int output_size, dim3 blockSize, bool init, unsigned long seed);
+    Dense(int batch_size, int input_size, int output_size, bool init, std::mt19937 &gen);
     ~Dense();
 
     float *get_weights() const override;
