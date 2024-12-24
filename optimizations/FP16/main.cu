@@ -193,11 +193,11 @@ int main(int argc, char **argv)
     test_set.prepareBatchesWithLabels(batch_size, INPUT_SIZE, test_x_batches, test_y_batches);
 
     Layer *layers[] = {
-        new Dense(batch_size, INPUT_SIZE, 128, dim3(blockSize1d), true, seed),
+        new Dense(batch_size, INPUT_SIZE, 128, true, global_rng),
         new ReLU(batch_size, 128),
-        new Dense(batch_size, 128, 128, dim3(blockSize1d), true, seed),
+        new Dense(batch_size, 128, 128, true, global_rng),
         new ReLU(batch_size, 128),
-        new Dense(batch_size, 128, OUTPUT_SIZE, dim3(blockSize1d), true, seed),
+        new Dense(batch_size, 128, OUTPUT_SIZE, true, global_rng),
         new Softmax(batch_size, OUTPUT_SIZE)};
 
     dim3 blockSizes[] = {
@@ -218,8 +218,8 @@ int main(int argc, char **argv)
     Accuracy acc_obj;
     float loss_batch;
 
-    HostTimer epoch_timer;
-    HostTimer total_timer;
+    GpuTimer epoch_timer;
+    GpuTimer total_timer;
     total_timer.Start();
 
     //tmp malloc

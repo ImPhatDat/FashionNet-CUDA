@@ -217,8 +217,8 @@ int main(int argc, char **argv)
     Accuracy acc_obj;
     float loss_batch;
 
-    HostTimer epoch_timer;
-    HostTimer total_timer;
+    GpuTimer epoch_timer;
+    GpuTimer total_timer;
     total_timer.Start();
 
     //tmp malloc
@@ -285,10 +285,10 @@ int main(int argc, char **argv)
         epoch_timer.Stop();
 
         // Get and print the elapsed time
-        printf("Epoch time: %f seconds\n", epoch_timer.Elapsed());
+        printf("Epoch time: %f seconds\n", epoch_timer.Elapsed() / 1000);
     }
     total_timer.Stop();
-    printf("Total time: %f seconds\n", total_timer.Elapsed());
+    printf("Total time: %f seconds\n", total_timer.Elapsed() / 1000);
 
     if (checkpoint_path != "")
         model.save_weights(checkpoint_path);

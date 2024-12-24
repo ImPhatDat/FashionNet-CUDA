@@ -14,7 +14,8 @@ public:
     int batch_size;
     int input_size;
     int output_size;
-    std::string name;    
+    std::string name;
+    int version;
 protected:
     float *input;  // Pointer to store input values
     float *output; // Pointer to store output values

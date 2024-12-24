@@ -4,6 +4,7 @@ Layer::Layer(int batch_size, int input_size, int output_size) {
     this->batch_size = batch_size;
     this->input_size = input_size;
     this->output_size = output_size;
+    this->version = 0;
 
     CHECK(cudaMalloc(&input, sizeof(float) * batch_size * input_size));
     CHECK(cudaMalloc(&output, sizeof(float) * batch_size * output_size));

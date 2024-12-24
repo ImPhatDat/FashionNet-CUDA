@@ -1,7 +1,7 @@
 #include "dense.hh"
 
 // glorot uniform
-void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
+void Dense::initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
 {
     // Calculate the Glorot Uniform limit
     float limit = std::sqrt(6.0f / (rows + cols)); 
@@ -46,7 +46,7 @@ __global__ void matmul_kernel(const float *A, const float *B, float *C, int M, i
     }
 }
 
-void matmul(const float *A, const float *B, float *C, int M, int K, int N, dim3 blockSize) {
+void Dense::matmul(const float *A, const float *B, float *C, int M, int K, int N, dim3 blockSize) {
     // Calculate grid size
     dim3 gridSize((N + blockSize.x - 1) / blockSize.x, (M + blockSize.y - 1) / blockSize.y);
     // Launch kernel
@@ -67,7 +67,7 @@ __global__ void transpose_kernel(const float *in, float *out, int M, int N)
     }
 }
 
-void transpose(const float *in, float *out, int M, int N, dim3 blockSize)
+void Dense::transpose(const float *in, float *out, int M, int N, dim3 blockSize)
 {
     dim3 gridSize((N + blockSize.x - 1) / blockSize.x, (
         M + blockSize.y - 1) / blockSize.y); // Grid size calculation

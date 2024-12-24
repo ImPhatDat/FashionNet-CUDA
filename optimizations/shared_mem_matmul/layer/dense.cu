@@ -1,33 +1,25 @@
 #include "../../../src_parallel/layer/dense.hh"
 
-// glorot uniform
-void initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
-{
-    // Calculate the Glorot Uniform limit
-    float limit = std::sqrt(6.0f / (rows + cols)); 
+__global__ void matmul_kernel(const float *A, const float *B, float *C, int M, int K, int N) {
+    // Compute row and column index
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
 
-    // Create a uniform distribution between -limit and +limit
-    std::uniform_real_distribution<float> dis(-limit, limit);
+    // Ensure valid thread indices
+    if (row < M && col < N) {
+        float sum = 0.0f;
 
-    // Initialize weights
-    for (int i = 0; i < rows; ++i)
-    {
-        for (int j = 0; j < cols; ++j)
-        {
-            weights[i * cols + j] = dis(gen);
+        // Perform dot product for the row of A and column of B
+        for (int k = 0; k < K; ++k) {
+            sum += A[row * K + k] * B[k * N + col];
         }
-    }
 
-    // Initialize biases to 0
-    for (int j = 0; j < cols; ++j)
-    {
-        biases[j] = 0.0f;
+        // Write result to C
+        C[row * N + col] = sum;
     }
 }
-
-
 #define TILE_WIDTH 32  
-__global__ void matmul_kernel(const float *A, const float *B, float *C, int M, int K, int N) {
+__global__ void matmul_kernel_version1(const float *A, const float *B, float *C, int M, int K, int N) {
     __shared__ float As[TILE_WIDTH][TILE_WIDTH];
     __shared__ float Bs[TILE_WIDTH][TILE_WIDTH];
 
@@ -55,7 +47,7 @@ __global__ void matmul_kernel(const float *A, const float *B, float *C, int M, i
         __syncthreads();
 
         // Compute partial dot product
-        #pragma unroll
+        // #pragma unroll
         for (int k = 0; k < TILE_WIDTH; ++k) {
             sum += As[threadIdx.y][k] * Bs[k][threadIdx.x];
         }
@@ -69,11 +61,16 @@ __global__ void matmul_kernel(const float *A, const float *B, float *C, int M, i
     }
 }
 
-void matmul(const float *A, const float *B, float *C, int M, int K, int N, dim3 blockSize) {
+
+void Dense::matmul(const float *A, const float *B, float *C, int M, int K, int N, dim3 blockSize) {
     // Calculate grid size
     dim3 gridSize((N + blockSize.x - 1) / blockSize.x, (M + blockSize.y - 1) / blockSize.y);
     // Launch kernel
-    matmul_kernel<<<gridSize, blockSize>>>(A, B, C, M, K, N);
+    if (this->version == 0)
+        matmul_kernel<<<gridSize, blockSize>>>(A, B, C, M, K, N);
+    else if (this->version == 1)
+        matmul_kernel_version1<<<gridSize, blockSize>>>(A, B, C, M, K, N);
+
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
 }
@@ -90,7 +87,7 @@ __global__ void transpose_kernel(const float *in, float *out, int M, int N)
     }
 }
 
-void transpose(const float *in, float *out, int M, int N, dim3 blockSize)
+void Dense::transpose(const float *in, float *out, int M, int N, dim3 blockSize)
 {
     dim3 gridSize((N + blockSize.x - 1) / blockSize.x, (
         M + blockSize.y - 1) / blockSize.y); // Grid size calculation
@@ -100,6 +97,31 @@ void transpose(const float *in, float *out, int M, int N, dim3 blockSize)
     CHECK(cudaDeviceSynchronize());
 }
 
+
+// glorot uniform
+void Dense::initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
+{
+    // Calculate the Glorot Uniform limit
+    float limit = std::sqrt(6.0f / (rows + cols)); 
+
+    // Create a uniform distribution between -limit and +limit
+    std::uniform_real_distribution<float> dis(-limit, limit);
+
+    // Initialize weights
+    for (int i = 0; i < rows; ++i)
+    {
+        for (int j = 0; j < cols; ++j)
+        {
+            weights[i * cols + j] = dis(gen);
+        }
+    }
+
+    // Initialize biases to 0
+    for (int j = 0; j < cols; ++j)
+    {
+        biases[j] = 0.0f;
+    }
+}
 
 Dense::Dense(int batch_size, int input_size, int output_size, bool init, std::mt19937 &gen) : Layer(batch_size, input_size, output_size)
 {

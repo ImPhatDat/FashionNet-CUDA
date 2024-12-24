@@ -187,8 +187,8 @@ int main(int argc, char **argv)
     std::cout << "\tCheckpoint: " << checkpoint_path << std::endl;
 
 
-    HostTimer epoch_timer;
-    HostTimer total_timer;
+    GpuTimer epoch_timer;
+    GpuTimer total_timer;
     total_timer.Start();
 
     // tmp malloc

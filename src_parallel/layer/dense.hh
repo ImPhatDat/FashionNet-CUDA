@@ -16,10 +16,6 @@
 
 #pragma once
 
-void initialize_dense(float *d_weights, float *d_biases, int rows, int cols, dim3 blockSize, unsigned long seed);
-
-void matmul(const float *A, const float *B, float *C, int M, int K, int N, dim3 blockSize);
-void transpose(const float *in, float *out, int M, int N);
 
 class Dense : public Layer
 {
@@ -34,6 +30,10 @@ private:
 public:
     Dense(int batch_size, int input_size, int output_size, bool init, std::mt19937 &gen);
     ~Dense();
+
+    void initialize_dense(float *d_weights, float *d_biases, int rows, int cols, std::mt19937 &gen);
+    void matmul(const float *A, const float *B, float *C, int M, int K, int N, dim3 blockSize);
+    void transpose(const float *in, float *out, int M, int N, dim3 blockSize);
 
     float *get_weights() const override;
     float *get_biases() const override;
