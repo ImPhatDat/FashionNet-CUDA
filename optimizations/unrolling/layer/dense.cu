@@ -142,9 +142,12 @@ __global__ void grad_biases_kernel(const float *output_d, float *grad_biases, in
 
     if (col < output_size) {
         float sum = 0.0f;
+
+        #pragma unroll
         for (int row = 0; row < batch_size; ++row) {
             sum += output_d[row * output_size + col];
         }
+
         grad_biases[col] = sum;
     }
 }
