@@ -214,7 +214,7 @@ int main(int argc, char **argv)
     const int NUM_LAYERS = sizeof(layers) / sizeof(layers[0]);
 
     Model model(layers, NUM_LAYERS, batch_size, INPUT_SIZE, OUTPUT_SIZE);
-    CategoricalCrossentropy loss_obj(__float2half(1e-7));
+    CategoricalCrossentropy loss_obj(__float2half(1e-4));
     Accuracy acc_obj;
     float loss_batch;
 
@@ -275,11 +275,6 @@ int main(int argc, char **argv)
                        bi, num_batches - 1,
                        loss_obj.compute_average_loss(), acc_obj.compute());
             }
-            int dum;
-            printf("batch %d\n", bi);
-            scanf("%d", &dum);
-            if (bi >= 100)
-                break;
         }
         loss_obj.reset_state();
         acc_obj.reset_state();
@@ -309,7 +304,6 @@ int main(int argc, char **argv)
 
         // Get and print the elapsed time
         printf("Epoch time: %f seconds\n", epoch_timer.Elapsed());
-        break;
     }
     total_timer.Stop();
     printf("Total time: %f seconds\n", total_timer.Elapsed());

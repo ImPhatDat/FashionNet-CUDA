@@ -53,7 +53,8 @@ __global__ void backward_kernel(const uint8_t *y_true, const __half *y_pred, __h
         for (int c = 0; c < num_classes; ++c)
         {
             __half pred_round = __hmax(pred_row[c], epsilon);  // Prevent underflow for small predictions
-            grad_row[c] = __hmul((-__float2half(1.0f) / pred_round), (__float2half(float(c == label))));  // Gradient calculation
+            __half delta = (c == label) ? __float2half(1.0f) : __float2half(0.0f);
+            grad_row[c] = __hmul(__hneg(__hdiv(__float2half(1.0f), pred_round)), delta);
         }
     }
 }
