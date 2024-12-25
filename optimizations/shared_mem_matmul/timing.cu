@@ -150,7 +150,7 @@ int main(int argc, char **argv)
 
     layer_to_time.version = 1;
     timer.Start();
-    layer_to_time.matmul(input_d, input_d2, output_d_2, batch_size, input_size, output_size, dim3(32, 32));
+    layer_to_time.matmul(input_d, input_d2, output_d_2, batch_size, input_size, output_size, dim3(16, 16));
     timer.Stop();
     printf("Verion 1 time: %f ms\n", timer.Elapsed());
 
