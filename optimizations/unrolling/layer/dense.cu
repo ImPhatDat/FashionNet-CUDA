@@ -1,5 +1,216 @@
 #include "../../../src_parallel/layer/dense.hh"
 
+// optimization here
+__global__ void transpose_kernel(const float *in, float *out, int M, int N)
+{
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < M && j < N)
+    {
+        // Transpose by swapping rows and columns
+        out[j * M + i] = in[i * N + j];
+    }
+}
+
+#define TILE_DIM 32
+__global__ void transpose_kernel_version1( const float *in, float *out, int height, int width, int block_dim) {
+    __shared__ float tile[TILE_DIM][TILE_DIM + 1]; // Avoid bank conflicts
+
+    // Calculate input and output indices
+    int x = blockIdx.x * TILE_DIM + threadIdx.x;
+    int y = blockIdx.y * TILE_DIM + threadIdx.y;
+    int width_in = width;
+
+    // Load data into shared memory
+    for (int j = 0; j < TILE_DIM; j += block_dim) {
+        if ((x < width) && (y + j < height)) {
+            tile[threadIdx.y + j][threadIdx.x] = in[(y + j) * width_in + x];
+        }
+    }
+    __syncthreads(); // Ensure all threads have loaded data
+
+    // Calculate transposed output indices
+    x = blockIdx.y * TILE_DIM + threadIdx.x;  // Swap x and y for transpose
+    y = blockIdx.x * TILE_DIM + threadIdx.y;
+
+    // Write transposed data from shared memory
+    for (int j = 0; j < TILE_DIM; j += block_dim) {
+        if ((x < height) && (y + j < width)) {
+            out[(y + j) * height + x] = tile[threadIdx.x][threadIdx.y + j];
+        }
+    }
+}
+
+__global__ void transpose_kernel_version2( const float *in, float *out, int height, int width, int block_dim) {
+    __shared__ float tile[TILE_DIM][TILE_DIM + 1]; // Avoid bank conflicts
+
+    // Calculate input and output indices
+    int x = blockIdx.x * TILE_DIM + threadIdx.x;
+    int y = blockIdx.y * TILE_DIM + threadIdx.y;
+    int width_in = width;
+
+    // Load data into shared memory
+    #pragma unroll
+    for (int j = 0; j < TILE_DIM; j += block_dim) {
+        if ((x < width) && (y + j < height)) {
+            tile[threadIdx.y + j][threadIdx.x] = in[(y + j) * width_in + x];
+        }
+    }
+    __syncthreads(); // Ensure all threads have loaded data
+
+    // Calculate transposed output indices
+    x = blockIdx.y * TILE_DIM + threadIdx.x;  // Swap x and y for transpose
+    y = blockIdx.x * TILE_DIM + threadIdx.y;
+
+    // Write transposed data from shared memory
+    #pragma unroll
+    for (int j = 0; j < TILE_DIM; j += block_dim) {
+        if ((x < height) && (y + j < width)) {
+            out[(y + j) * height + x] = tile[threadIdx.x][threadIdx.y + j];
+        }
+    }
+}
+
+
+void Dense::transpose(const float *in, float *out, int M, int N, dim3 blockSize)
+{
+    dim3 gridSize((N + blockSize.x - 1) / blockSize.x, (
+        M + blockSize.y - 1) / blockSize.y); // Grid size calculation
+    // Launch the kernel
+
+    if (this->version == 0)
+        transpose_kernel<<<gridSize, blockSize>>>(in, out, M, N);
+    else if (this->version == 1)
+        transpose_kernel_version1<<<gridSize, blockSize>>>(in, out, M, N, blockSize.y);
+    else if (this->version == 2)
+        transpose_kernel_version2<<<gridSize, blockSize>>>(in, out, M, N, blockSize.y);
+
+
+    CHECK(cudaGetLastError());
+    CHECK(cudaDeviceSynchronize());
+}
+
+__global__ void matmul_kernel(const float *A, const float *B, float *C, int M, int K, int N) {
+    // Compute row and column index
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Ensure valid thread indices
+    if (row < M && col < N) {
+        float sum = 0.0f;
+
+        // Perform dot product for the row of A and column of B
+        for (int k = 0; k < K; ++k) {
+            sum += A[row * K + k] * B[k * N + col];
+        }
+
+        // Write result to C
+        C[row * N + col] = sum;
+    }
+}
+
+__global__ void matmul_kernel_version1(const float *A, const float *B, float *C, int M, int K, int N) {
+    __shared__ float As[TILE_DIM][TILE_DIM];
+    __shared__ float Bs[TILE_DIM][TILE_DIM];
+
+    int row = blockIdx.y * TILE_DIM + threadIdx.y;
+    int col = blockIdx.x * TILE_DIM + threadIdx.x;
+
+    float sum = 0.0f;
+
+    // Iterate over tiles
+    for (int t = 0; t < (K + TILE_DIM - 1) / TILE_DIM; ++t) {
+        // Load tile from A
+        if (row < M && t * TILE_DIM + threadIdx.x < K) {
+            As[threadIdx.y][threadIdx.x] = A[row * K + t * TILE_DIM + threadIdx.x];
+        } else {
+            As[threadIdx.y][threadIdx.x] = 0.0f;
+        }
+
+        // Load tile from B
+        if (t * TILE_DIM + threadIdx.y < K && col < N) {
+            Bs[threadIdx.y][threadIdx.x] = B[(t * TILE_DIM + threadIdx.y) * N + col];
+        } else {
+            Bs[threadIdx.y][threadIdx.x] = 0.0f;
+        }
+
+        __syncthreads();
+
+        // Compute partial dot product
+        // #pragma unroll
+        for (int k = 0; k < TILE_DIM; ++k) {
+            sum += As[threadIdx.y][k] * Bs[k][threadIdx.x];
+        }
+
+        __syncthreads();
+    }
+
+    // Write result
+    if (row < M && col < N) {
+        C[row * N + col] = sum;
+    }
+}
+
+__global__ void matmul_kernel_version2(const float *A, const float *B, float *C, int M, int K, int N) {
+    __shared__ float As[TILE_DIM][TILE_DIM];
+    __shared__ float Bs[TILE_DIM][TILE_DIM];
+
+    int row = blockIdx.y * TILE_DIM + threadIdx.y;
+    int col = blockIdx.x * TILE_DIM + threadIdx.x;
+
+    float sum = 0.0f;
+
+    // Iterate over tiles
+    for (int t = 0; t < (K + TILE_DIM - 1) / TILE_DIM; ++t) {
+        // Load tile from A
+        if (row < M && t * TILE_DIM + threadIdx.x < K) {
+            As[threadIdx.y][threadIdx.x] = A[row * K + t * TILE_DIM + threadIdx.x];
+        } else {
+            As[threadIdx.y][threadIdx.x] = 0.0f;
+        }
+
+        // Load tile from B
+        if (t * TILE_DIM + threadIdx.y < K && col < N) {
+            Bs[threadIdx.y][threadIdx.x] = B[(t * TILE_DIM + threadIdx.y) * N + col];
+        } else {
+            Bs[threadIdx.y][threadIdx.x] = 0.0f;
+        }
+
+        __syncthreads();
+
+        // Compute partial dot product
+        #pragma unroll
+        for (int k = 0; k < TILE_DIM; ++k) {
+            sum += As[threadIdx.y][k] * Bs[k][threadIdx.x];
+        }
+
+        __syncthreads();
+    }
+
+    // Write result
+    if (row < M && col < N) {
+        C[row * N + col] = sum;
+    }
+}
+
+
+void Dense::matmul(const float *A, const float *B, float *C, int M, int K, int N, dim3 blockSize) {
+    // Calculate grid size
+    dim3 gridSize((N + blockSize.x - 1) / blockSize.x, (M + blockSize.y - 1) / blockSize.y);
+    // Launch kernel
+    if (this->version == 0)
+        matmul_kernel<<<gridSize, blockSize>>>(A, B, C, M, K, N);
+    else if (this->version == 1)
+        matmul_kernel_version1<<<gridSize, blockSize>>>(A, B, C, M, K, N);
+    else if (this->version == 2)
+        matmul_kernel_version2<<<gridSize, blockSize>>>(A, B, C, M, K, N);
+
+
+    CHECK(cudaGetLastError());
+    CHECK(cudaDeviceSynchronize());
+}
+
 // glorot uniform
 void Dense::initialize_dense(float *weights, float *biases, int rows, int cols, std::mt19937 &gen)
 {
@@ -23,57 +234,6 @@ void Dense::initialize_dense(float *weights, float *biases, int rows, int cols, 
     {
         biases[j] = 0.0f;
     }
-}
-
-__global__ void matmul_kernel(const float *A, const float *B, float *C, int M, int K, int N) {
-    // Compute row and column index
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // Ensure valid thread indices
-    if (row < M && col < N) {
-        float sum = 0.0f;
-
-        // Perform dot product for the row of A and column of B with unrolled loop
-        #pragma unroll
-        for (int k = 0; k < K; ++k) {
-            sum += A[row * K + k] * B[k * N + col];
-        }
-
-        // Write result to C
-        C[row * N + col] = sum;
-    }
-}
-
-void Dense::matmul(const float *A, const float *B, float *C, int M, int K, int N, dim3 blockSize) {
-    // Calculate grid size
-    dim3 gridSize((N + blockSize.x - 1) / blockSize.x, (M + blockSize.y - 1) / blockSize.y);
-    // Launch kernel
-    matmul_kernel<<<gridSize, blockSize>>>(A, B, C, M, K, N);
-    CHECK(cudaGetLastError());
-    CHECK(cudaDeviceSynchronize());
-}
-
-__global__ void transpose_kernel(const float *in, float *out, int M, int N)
-{
-    int i = blockIdx.y * blockDim.y + threadIdx.y;
-    int j = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (i < M && j < N)
-    {
-        // Transpose by swapping rows and columns
-        out[j * M + i] = in[i * N + j];
-    }
-}
-
-void Dense::transpose(const float *in, float *out, int M, int N, dim3 blockSize)
-{
-    dim3 gridSize((N + blockSize.x - 1) / blockSize.x, (
-        M + blockSize.y - 1) / blockSize.y); // Grid size calculation
-    // Launch the kernel
-    transpose_kernel<<<gridSize, blockSize>>>(in, out, M, N);
-    CHECK(cudaGetLastError());
-    CHECK(cudaDeviceSynchronize());
 }
 
 
@@ -142,12 +302,9 @@ __global__ void grad_biases_kernel(const float *output_d, float *grad_biases, in
 
     if (col < output_size) {
         float sum = 0.0f;
-
-        #pragma unroll
         for (int row = 0; row < batch_size; ++row) {
             sum += output_d[row * output_size + col];
         }
-
         grad_biases[col] = sum;
     }
 }

@@ -99,6 +99,8 @@ int main(int argc, char **argv)
     std::uniform_real_distribution<float> dis(-1, 1);
 
     float* random_input1 = new float[batch_size * input_size];
+    float* output11 = new float[batch_size * input_size];
+
     for (int i = 0; i < batch_size * input_size; i++) {
         random_input1[i] = dis(global_rng);
     }
@@ -152,13 +154,13 @@ int main(int argc, char **argv)
     timer.Start();
     layer_to_time.matmul(input_d, input_d2, output_d_2, batch_size, input_size, output_size, dim3(32, 32));
     timer.Stop();
-    printf("Verion 1 time: %f ms\n", timer.Elapsed());
+    printf("Matmul Verion 1 time: %f ms\n", timer.Elapsed());
 
     layer_to_time.version = 0;
     timer.Start();
     layer_to_time.matmul(input_d, input_d2, output_d_1, batch_size, input_size, output_size, dim3(32, 32));
     timer.Stop();
-    printf("Verion 0 time: %f ms\n", timer.Elapsed());
+    printf("Matmul Verion 0 time: %f ms\n", timer.Elapsed());
 
     bool is_correct1 = checkCorrect(output_d_1, output_host, batch_size, output_size);
     bool is_correct2 = checkCorrect(output_d_2, output_host, batch_size, output_size);
@@ -166,14 +168,32 @@ int main(int argc, char **argv)
     printf("Correct 2? %s\n", is_correct2 ? "true" : "false");
 
 
+    float* output_d_11;
+    CHECK(cudaMalloc(&output_d_11, sizeof(float) * batch_size * input_size));
+
+    layer_to_time.version = 1;
+    timer.Start();
+    layer_to_time.transpose(input_d, output_d_11, batch_size, input_size, dim3(32, 32));
+    timer.Stop();
+    printf("Transpose Verion 1 time: %f ms\n", timer.Elapsed());
+
+    layer_to_time.version = 0;
+    timer.Start();
+    layer_to_time.transpose(input_d, input_d_11, batch_size, input_size, dim3(32, 32));
+    timer.Stop();
+    printf("Transpose Verion 0 time: %f ms\n", timer.Elapsed());
+
+
 
     CHECK(cudaFree(input_d));
     CHECK(cudaFree(output_d_1));
     CHECK(cudaFree(output_d_2));
+    CHECK(cudaFree(output_d_11));
 
 
     delete[] random_input1;
     delete[] random_input2;
     delete[] output_host;
+    delete[] output11;
     return 0;
 }

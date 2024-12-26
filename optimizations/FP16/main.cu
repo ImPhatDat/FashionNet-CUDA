@@ -218,8 +218,8 @@ int main(int argc, char **argv)
     Accuracy acc_obj;
     float loss_batch;
 
-    GpuTimer epoch_timer;
-    GpuTimer total_timer;
+    HostTimer epoch_timer;
+    HostTimer total_timer;
     total_timer.Start();
 
     //tmp malloc
