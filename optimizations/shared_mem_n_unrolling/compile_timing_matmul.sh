@@ -1,0 +1,1 @@
+nvcc timing_matmul.cu layer/dense.cu ../../src_parallel/layer/layer.cu -std=c++11 -o timing_matmul.out

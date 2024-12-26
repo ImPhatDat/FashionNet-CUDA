@@ -131,8 +131,17 @@ int main(int argc, char **argv)
     timer.Stop();
     // printf("Verion 1 time: %f ms\n", timer.Elapsed());
 
+    layer_to_time.version = 2;
+    float* output_d_2;
+    CHECK(cudaMalloc(&output_d_2, sizeof(float) * batch_size * input_size));
+    timer.Start();
+    layer_to_time.transpose(input_d, output_d_2, batch_size, input_size, dim3(32, 32));
+    timer.Stop();
+    // printf("Verion 2 time: %f ms\n", timer.Elapsed());
+
     float avg_time0 = 0;
     float avg_time1 = 0;
+    float avg_time2 = 0;
     int num_runs = 50;
 
     for (int i = 0; i < num_runs; i++) {
@@ -147,23 +156,34 @@ int main(int argc, char **argv)
         layer_to_time.transpose(input_d, output_d_1, batch_size, input_size, dim3(32, 32));
         timer.Stop();
         avg_time1 += timer.Elapsed();
+
+        layer_to_time.version = 2;
+        timer.Start();
+        layer_to_time.transpose(input_d, output_d_2, batch_size, input_size, dim3(32, 32));
+        timer.Stop();
+        avg_time2 += timer.Elapsed();
     }
 
     avg_time0 /= num_runs;
     avg_time1 /= num_runs;
+    avg_time2 /= num_runs;
     printf("Num runs: %d\n", num_runs);
-    printf("Average time version 0: %f ms\n", avg_time0);
-    printf("Average time version 1: %f ms\n", avg_time1);
+    printf("Average time version 0 (parallel): %f ms\n", avg_time0);
+    printf("Average time version 1 (shared mem): %f ms\n", avg_time1);
+    printf("Average time version 2 (shared mem + unrolling): %f ms\n", avg_time2);
 
-    bool is_correct1 = checkCorrect(output_d_0, output_host, batch_size, input_size);
-    bool is_correct2 = checkCorrect(output_d_1, output_host, batch_size, input_size);
-    printf("Correct0 ? %s\n", is_correct1 ? "true" : "false");
-    printf("Correct1 ? %s\n", is_correct2 ? "true" : "false");
+    bool is_correct0 = checkCorrect(output_d_0, output_host, batch_size, input_size);
+    bool is_correct1 = checkCorrect(output_d_1, output_host, batch_size, input_size);
+    bool is_correct2 = checkCorrect(output_d_2, output_host, batch_size, input_size);
+    printf("Correct0 ? %s\n", is_correct0 ? "true" : "false");
+    printf("Correct1 ? %s\n", is_correct1 ? "true" : "false");
+    printf("Correct2 ? %s\n", is_correct2 ? "true" : "false");
 
 
     CHECK(cudaFree(input_d));
     CHECK(cudaFree(output_d_0));
     CHECK(cudaFree(output_d_1));
+    CHECK(cudaFree(output_d_2));
 
 
     delete[] random_input;

@@ -107,6 +107,7 @@ int main(int argc, char **argv)
     float learning_rate = 0.001;
     std::string checkpoint_path = "";
 
+    int version_kernel = 0;
     int blockSize1d = 256;
     int blockSize2d_x = 32;
     int blockSize2d_y = 32;
@@ -114,12 +115,15 @@ int main(int argc, char **argv)
     int opt;
     
     // Parsing command-line arguments
-    while ((opt = getopt(argc, argv, "d:e:b:l:p:k:x:y:")) != -1)
+    while ((opt = getopt(argc, argv, "d:v:e:b:l:p:k:x:y:")) != -1)
     {
         switch (opt)
         {
         case 'd':
             dataset_path = optarg; // Convert argument to integer
+            break;
+        case 'v':
+            version_kernel = atoi(optarg); // Convert argument to integer
             break;
         case 'e':
             num_epoch = atoi(optarg); // Convert argument to integer
@@ -143,13 +147,14 @@ int main(int argc, char **argv)
             blockSize2d_y = atoi(optarg); // Convert argument to integer
             break;
         default:
-            fprintf(stderr, "Usage: %s [-d dataset_path] [-e num_epoch] [-b batchsize] [-l learning_rate] [-p checkpoint_path] [-k blockSize1d] [-x blockSize2d_x] [-y blockSize2d_y]\n", argv[0]);
+            fprintf(stderr, "Usage: %s [-d dataset_path] [-v kernel_version] [-e num_epoch] [-b batchsize] [-l learning_rate] [-p checkpoint_path] [-k blockSize1d] [-x blockSize2d_x] [-y blockSize2d_y]\n", argv[0]);
             exit(EXIT_FAILURE);
         }
     }
 
     std::cout << "\nConfigurations:" << std::endl;
     std::cout << "\tDataset path: " << dataset_path << std::endl;
+    std::cout << "\tKernel version: " << version_kernel << std::endl;
     std::cout << "\tNum epoch: " << num_epoch << std::endl;
     std::cout << "\tBatch size: " << batch_size << std::endl;
     std::cout << "\tLearning rate: " << learning_rate << std::endl;
@@ -198,6 +203,11 @@ int main(int argc, char **argv)
         new ReLU(batch_size, 128),
         new Dense(batch_size, 128, OUTPUT_SIZE, true, global_rng),
         new Softmax(batch_size, OUTPUT_SIZE)};
+
+    for (int i = 0; i < sizeof(layers) / sizeof(layers[0]); i++)
+    {
+        layers[i]->version = version_kernel;
+    }
 
     dim3 blockSizes[] = {
         dim3(blockSize2d_x, blockSize2d_y),
@@ -288,6 +298,8 @@ int main(int argc, char **argv)
         printf("Epoch time: %f seconds\n", epoch_timer.Elapsed() / 1000);
     }
     total_timer.Stop();
+    printf("====================Training finished====================\n");
+    printf("Average time per epoch: %f seconds\n", total_timer.Elapsed() / 1000 / num_epoch);
     printf("Total time: %f seconds\n", total_timer.Elapsed() / 1000);
 
     if (checkpoint_path != "")

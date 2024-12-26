@@ -84,23 +84,33 @@ bool checkCorrect(float* a, float* b, int shape1, int shape2) {
     return res;
 }
 
+void matmul_host(float* A, float* B, float* C, int M, int K, int N) {
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            float sum = 0;
+            for (int k = 0; k < K; k++) {
+                sum += A[i * K + k] * B[k * N + j];
+            }
+            C[i * N + j] = sum;
+        }
+    }
+}
+
 
 // Model configurations
 int main(int argc, char **argv)
 {
     printDeviceInfo();
     
-    int batch_size = 32;
-    int input_size = 64;
-    int output_size = 32;
+    int batch_size = 1024;
+    int input_size = 512;
+    int output_size = 256;
     
     Dense layer_to_time(batch_size, input_size, output_size, true, global_rng);
     
     std::uniform_real_distribution<float> dis(-1, 1);
 
     float* random_input1 = new float[batch_size * input_size];
-    float* output11 = new float[batch_size * input_size];
-
     for (int i = 0; i < batch_size * input_size; i++) {
         random_input1[i] = dis(global_rng);
     }
@@ -112,15 +122,7 @@ int main(int argc, char **argv)
 
     // host matmul
     float * output_host = new float[batch_size * output_size];
-    for (int i = 0; i < batch_size; i++) {
-        for (int j = 0; j < output_size; j++) {
-            float sum = 0;
-            for (int k =0; k < input_size; k++) {
-                sum += random_input1[i * input_size + k] * random_input2[k * output_size + j];
-            }
-            output_host[i * output_size + j] = sum;
-        }
-    }
+    matmul_host(random_input1, random_input2, output_host, batch_size, input_size, output_size);
 
     float* input_d;
     CHECK(cudaMalloc(&input_d, sizeof(float) * batch_size * input_size));
@@ -133,67 +135,83 @@ int main(int argc, char **argv)
     GpuTimer timer;
 
 
-    layer_to_time.version = 1;
-    float* output_d_2;
-    CHECK(cudaMalloc(&output_d_2, sizeof(float) * batch_size * output_size));
-    timer.Start();
-    layer_to_time.matmul(input_d, input_d2, output_d_2, batch_size, input_size, output_size, dim3(32, 32));
-    timer.Stop();
-    // printf("Verion 1 time: %f ms\n", timer.Elapsed());
-
     layer_to_time.version = 0;
+    float* output_d_0;
+    CHECK(cudaMalloc(&output_d_0, sizeof(float) * batch_size * output_size));
+    timer.Start();
+    layer_to_time.matmul(input_d, input_d2, output_d_0, batch_size, input_size, output_size, dim3(32, 32));
+    timer.Stop();
+    // printf("Verion 0 time: %f ms\n", timer.Elapsed());
+
+    layer_to_time.version = 1;
     float* output_d_1;
     CHECK(cudaMalloc(&output_d_1, sizeof(float) * batch_size * output_size));
     timer.Start();
     layer_to_time.matmul(input_d, input_d2, output_d_1, batch_size, input_size, output_size, dim3(32, 32));
     timer.Stop();
-    // printf("Verion 0 time: %f ms\n", timer.Elapsed());
+    // printf("Verion 1 time: %f ms\n", timer.Elapsed());
 
 
-    layer_to_time.version = 1;
+    layer_to_time.version = 2;
+    float* output_d_2;
+    CHECK(cudaMalloc(&output_d_2, sizeof(float) * batch_size * output_size));
     timer.Start();
     layer_to_time.matmul(input_d, input_d2, output_d_2, batch_size, input_size, output_size, dim3(32, 32));
     timer.Stop();
-    printf("Matmul Verion 1 time: %f ms\n", timer.Elapsed());
+    // printf("Verion 2 time: %f ms\n", timer.Elapsed());
 
-    layer_to_time.version = 0;
-    timer.Start();
-    layer_to_time.matmul(input_d, input_d2, output_d_1, batch_size, input_size, output_size, dim3(32, 32));
-    timer.Stop();
-    printf("Matmul Verion 0 time: %f ms\n", timer.Elapsed());
+    float avg_time0 = 0;
+    float avg_time1 = 0;
+    float avg_time2 = 0;
+    int num_runs = 50;
+    for (int i = 0; i < num_runs; i++) {
+        layer_to_time.version = 0;
+        timer.Start();
+        layer_to_time.matmul(input_d, input_d2, output_d_0, batch_size, input_size, output_size, dim3(32, 32));
+        timer.Stop();
+        avg_time0 += timer.Elapsed();
 
+        layer_to_time.version = 1;
+        timer.Start();
+        layer_to_time.matmul(input_d, input_d2, output_d_1, batch_size, input_size, output_size, dim3(32, 32));
+        timer.Stop();
+        avg_time1 += timer.Elapsed();
+
+        layer_to_time.version = 2;
+        timer.Start();
+        layer_to_time.matmul(input_d, input_d2, output_d_2, batch_size, input_size, output_size, dim3(32, 32));
+        timer.Stop();
+        avg_time2 += timer.Elapsed();
+    }
+
+    avg_time0 /= num_runs;
+    avg_time1 /= num_runs;
+    avg_time2 /= num_runs;
+    printf("Num runs: %d\n", num_runs);
+    printf("Average time version 0 (parallel): %f ms\n", avg_time0);
+    printf("Average time version 1 (shared mem): %f ms\n", avg_time1);
+    printf("Average time version 2 (shared mem + unrolling): %f ms\n", avg_time2);
+
+
+    bool is_correct0 = checkCorrect(output_d_0, output_host, batch_size, output_size);
     bool is_correct1 = checkCorrect(output_d_1, output_host, batch_size, output_size);
     bool is_correct2 = checkCorrect(output_d_2, output_host, batch_size, output_size);
+    printf("Correct 0? %s\n", is_correct0 ? "true" : "false");
     printf("Correct 1? %s\n", is_correct1 ? "true" : "false");
     printf("Correct 2? %s\n", is_correct2 ? "true" : "false");
 
 
-    float* output_d_11;
-    CHECK(cudaMalloc(&output_d_11, sizeof(float) * batch_size * input_size));
-
-    layer_to_time.version = 1;
-    timer.Start();
-    layer_to_time.transpose(input_d, output_d_11, batch_size, input_size, dim3(32, 32));
-    timer.Stop();
-    printf("Transpose Verion 1 time: %f ms\n", timer.Elapsed());
-
-    layer_to_time.version = 0;
-    timer.Start();
-    layer_to_time.transpose(input_d, input_d_11, batch_size, input_size, dim3(32, 32));
-    timer.Stop();
-    printf("Transpose Verion 0 time: %f ms\n", timer.Elapsed());
-
-
 
     CHECK(cudaFree(input_d));
+    CHECK(cudaFree(input_d2));
+    CHECK(cudaFree(output_d_0));
     CHECK(cudaFree(output_d_1));
     CHECK(cudaFree(output_d_2));
-    CHECK(cudaFree(output_d_11));
+
 
 
     delete[] random_input1;
     delete[] random_input2;
     delete[] output_host;
-    delete[] output11;
     return 0;
 }
