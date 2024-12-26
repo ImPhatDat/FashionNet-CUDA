@@ -101,7 +101,7 @@ const int OUTPUT_SIZE = 10;
 int main(int argc, char **argv)
 {
     printDeviceInfo();
-    std::string dataset_path = "";
+    std::string dataset_path = "../data/fashion-mnist";;
     int num_epoch = 10;
     int batch_size = 64; // Default value
     float learning_rate = 0.001;

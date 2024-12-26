@@ -64,14 +64,14 @@ std::mt19937 global_rng(1); // Random number generator
 bool checkCorrect(float* a, float* b, int shape1, int shape2) {
     float* tmpa = new float[shape1 * shape2];
     CHECK(cudaMemcpy(tmpa, a, sizeof(float) * shape1 * shape2, cudaMemcpyDeviceToHost));
-    float* tmpb = new float[shape1 * shape2];
-    CHECK(cudaMemcpy(tmpb, b, sizeof(float) * shape1 * shape2, cudaMemcpyDeviceToHost));
+    // float* tmpb = new float[shape1 * shape2];
+    // CHECK(cudaMemcpy(tmpb, b, sizeof(float) * shape1 * shape2, cudaMemcpyDeviceToHost));
 
     bool res = true;
     for (int i = 0; i < shape1; i++) {
         for (int j = 0; j < shape2; j++) {
             float aa = tmpa[i * shape2 + j];
-            float bb = tmpb[i * shape2 + j];
+            float bb = b[i * shape2 + j];
             if (aa != bb) {
                 printf("Missmatch at %d,%d: %f vs %f\n", i, j, aa, bb);
                 res = false;
@@ -80,8 +80,15 @@ bool checkCorrect(float* a, float* b, int shape1, int shape2) {
     }
 
     delete[] tmpa;
-    delete[] tmpb;
     return res;
+}
+
+void transpose_host(float* in, float* out, int M, int N) {
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            out[j * M + i] = in[i * N + j];
+        }
+    }
 }
 
 // Model configurations
@@ -98,51 +105,68 @@ int main(int argc, char **argv)
     for (int i = 0; i < batch_size * input_size; i++) {
         random_input[i] = i;
     }
+
+    float* output_host = new float[batch_size * input_size];
+    transpose_host(random_input, output_host, batch_size, input_size);
+
     GpuTimer timer;
 
     float* input_d;
     CHECK(cudaMalloc(&input_d, sizeof(float) * batch_size * input_size));
     CHECK(cudaMemcpy(input_d, random_input, sizeof(float) * batch_size * input_size, cudaMemcpyHostToDevice));
 
+    layer_to_time.version = 0;
+    float* output_d_0;
+    CHECK(cudaMalloc(&output_d_0, sizeof(float) * batch_size * input_size));
+    timer.Start();
+    layer_to_time.transpose(input_d, output_d_0, batch_size, input_size, dim3(32, 32));
+    timer.Stop();
+    // printf("Verion 0 time: %f ms\n", timer.Elapsed());
+
+    layer_to_time.version = 1;
     float* output_d_1;
     CHECK(cudaMalloc(&output_d_1, sizeof(float) * batch_size * input_size));
     timer.Start();
     layer_to_time.transpose(input_d, output_d_1, batch_size, input_size, dim3(32, 32));
     timer.Stop();
-    // printf("Verion 0 time: %f ms\n", timer.Elapsed());
-
-    layer_to_time.version = 1;
-    float* output_d_2;
-    CHECK(cudaMalloc(&output_d_2, sizeof(float) * batch_size * input_size));
-    timer.Start();
-    layer_to_time.transpose(input_d, output_d_2, batch_size, input_size, dim3(32, 32));
-    timer.Stop();
     // printf("Verion 1 time: %f ms\n", timer.Elapsed());
 
-    layer_to_time.version = 1;
-    timer.Start();
-    layer_to_time.transpose(input_d, output_d_2, batch_size, input_size, dim3(32, 32));
-    timer.Stop();
-    printf("Verion 1 time: %f ms\n", timer.Elapsed());
+    float avg_time0 = 0;
+    float avg_time1 = 0;
+    int num_runs = 50;
 
-    layer_to_time.version = 0;
-    timer.Start();
-    layer_to_time.transpose(input_d, output_d_1, batch_size, input_size, dim3(32, 32));
-    timer.Stop();
-    printf("Verion 0 time: %f ms\n", timer.Elapsed());
+    for (int i = 0; i < num_runs; i++) {
+        layer_to_time.version = 0;
+        timer.Start();
+        layer_to_time.transpose(input_d, output_d_0, batch_size, input_size, dim3(32, 32));
+        timer.Stop();
+        avg_time0 += timer.Elapsed();
 
+        layer_to_time.version = 1;
+        timer.Start();
+        layer_to_time.transpose(input_d, output_d_1, batch_size, input_size, dim3(32, 32));
+        timer.Stop();
+        avg_time1 += timer.Elapsed();
+    }
 
+    avg_time0 /= num_runs;
+    avg_time1 /= num_runs;
+    printf("Num runs: %d\n", num_runs);
+    printf("Average time version 0: %f ms\n", avg_time0);
+    printf("Average time version 1: %f ms\n", avg_time1);
 
-    bool is_correct = checkCorrect(output_d_1, output_d_2, batch_size, input_size);
-    printf("Correct? %s\n", is_correct ? "true" : "false");
+    bool is_correct1 = checkCorrect(output_d_0, output_host, batch_size, input_size);
+    bool is_correct2 = checkCorrect(output_d_1, output_host, batch_size, input_size);
+    printf("Correct0 ? %s\n", is_correct1 ? "true" : "false");
+    printf("Correct1 ? %s\n", is_correct2 ? "true" : "false");
 
 
     CHECK(cudaFree(input_d));
+    CHECK(cudaFree(output_d_0));
     CHECK(cudaFree(output_d_1));
-    CHECK(cudaFree(output_d_2));
 
 
     delete[] random_input;
-
+    delete[] output_host;
     return 0;
 }
