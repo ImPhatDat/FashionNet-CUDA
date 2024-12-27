@@ -243,7 +243,7 @@ int main(int argc, char **argv)
     }
     total_timer.Stop();
     printf("====================Training finished====================\n");
-    printf("Average time per epoch: %f seconds\n", total_timer.Elapsed() / 1000 / num_epoch);
+    printf("Average time per epoch: %f seconds\n", total_timer.Elapsed() / num_epoch);
     printf("Total time: %f seconds\n", total_timer.Elapsed());
 
     if (checkpoint_path != "")
